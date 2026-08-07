@@ -1,0 +1,88 @@
+{
+  "note_range": [
+    "G#6",
+    "G7"
+  ],
+  "reference_note": "C7",
+  "step_cents": 100,
+  "body_length_mm": 65.974,
+  "formula": "freq_hz = A / (bore_mm - e)",
+  "A": 87985.1,
+  "e": -10.01,
+  "note": "この係数は実測から当てはめたものである。当てはめには設計値ではなく、造形データから実測した空洞の長さを用いた。プリンタや材料が違えばずれるので、手元で較正コームを刷って測り直すこと。",
+  "mesh_note": "12本のうち数本は、内部の仕切り壁が外壁に接する箇所で辺が4つの面に共有される（穴は開いていない）。スライサは問題なく扱え、実機で刷って鳴ることを確かめてあるが、厳密な水密性を求める道具では警告が出る。自動修復をかけると形が変わって音がずれるので、直していない。",
+  "notes": [
+    {
+      "note": "G#6",
+      "freq_hz": 1661.22,
+      "bore_mm": 62.974,
+      "file": "flute_Gs6.stl"
+    },
+    {
+      "note": "A6",
+      "freq_hz": 1760.0,
+      "bore_mm": 60.002,
+      "file": "flute_A6.stl"
+    },
+    {
+      "note": "A#6",
+      "freq_hz": 1864.66,
+      "bore_mm": 57.196,
+      "file": "flute_As6.stl"
+    },
+    {
+      "note": "B6",
+      "freq_hz": 1975.53,
+      "bore_mm": 54.547,
+      "file": "flute_B6.stl"
+    },
+    {
+      "note": "C7",
+      "freq_hz": 2093.0,
+      "bore_mm": 52.048,
+      "file": "flute_C7.stl"
+    },
+    {
+      "note": "C#7",
+      "freq_hz": 2217.46,
+      "bore_mm": 49.688,
+      "file": "flute_Cs7.stl"
+    },
+    {
+      "note": "D7",
+      "freq_hz": 2349.32,
+      "bore_mm": 47.461,
+      "file": "flute_D7.stl"
+    },
+    {
+      "note": "D#7",
+      "freq_hz": 2489.02,
+      "bore_mm": 45.359,
+      "file": "flute_Ds7.stl"
+    },
+    {
+      "note": "E7",
+      "freq_hz": 2637.02,
+      "bore_mm": 43.375,
+      "file": "flute_E7.stl"
+    },
+    {
+      "note": "F7",
+      "freq_hz": 2793.83,
+      "bore_mm": 41.503,
+      "file": "flute_F7.stl"
+    },
+    {
+      "note": "F#7",
+      "freq_hz": 2959.96,
+      "bore_mm": 39.735,
+      "file": "flute_Fs7.stl"
+    },
+    {
+      "note": "G7",
+      "freq_hz": 3135.96,
+      "bore_mm": 38.067,
+      "file": "flute_G7.stl"
+    }
+  ]
+}

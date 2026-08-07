@@ -1,0 +1,7 @@
+# 例を動かすと出るもの
+embed/examples/*.stl
+!embed/examples/*_reference.stl
+
+__pycache__/
+*.pyc
+.DS_Store
