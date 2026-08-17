@@ -1,8 +1,9 @@
 {
   "lo_note": "G#6",
-  "hi_note": "F#7",
+  "hi_note": "G7",
   "step_cents": 100,
   "reference_note": "C7",
-  "ecc_parity": 0,
-  "mode": "symbols"
+  "ecc_parity": 1,
+  "mode": "symbols",
+  "no_repeat": true
 }

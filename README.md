@@ -22,10 +22,10 @@
 | 場所 | 何が入っているか |
 |---|---|
 | `flutes/` | 統一管長の笛12音ぶんのSTLと較正データ |
-| `codec/` | 符号の参照実装（Python）と**試験ベクタ**と仕様書 |
+| `codec/` | 符号の参照実装（Python）と**試験ベクタ**と仕様書、**紙の上で復号するための早見表** |
 | `decoder/` | ブラウザだけで動く復号器。検査94件つき |
-| `embed/` | 日用品へ埋め込む道具と、2つの検査 |
-| `gallery/` | 作例の写真と造形データ |
+| `embed/` | 日用品へ埋め込む道具と、2つの検査、**手順書2種** |
+| `gallery/` | 作例の写真と造形データ（かるた札・2枚組のカード・カード・箱・画像タイル） |
 
 ## 笛の素材（`flutes/`）
 
@@ -63,6 +63,11 @@ node decoder/cipher_codec.test.js     # ALL PASS (12 vectors)
 符号の詳しい仕様は [`codec/SPEC.md`](codec/SPEC.md) にある。論文の設計章より細かく、
 実装に足る記述にしてある。
 
+**紙と鉛筆だけで誤り訂正まで行うための早見表**を [`codec/manual_decode_card.md`](codec/manual_decode_card.md)
+に置いた。位数11の有限体では2が原始根なので、10項のべき乗表と10項の対数表があれば、
+掛け算と割り算は足し算と引き算になる。手順が実装と食い違っていないかは
+`codec/verify_manual_decode.py` で確かめられる。
+
 ## 復号器（`decoder/`）
 
 ブラウザだけで動く。その場で吹いても、録音した音声を読ませても復号できる。
@@ -87,8 +92,10 @@ cd decoder && for t in fft_peak silence_segmenter tempo_filter cipher_codec; do
 
 ## 日用品への埋め込み（`embed/`）
 
-任意の3Dモデルに笛を配置して、印刷できる形にする。詳しくは
-[`embed/HOWTO.md`](embed/HOWTO.md) を読むこと。
+任意の3Dモデルに笛を配置して、印刷できる形にする。手順書は2つある。
+人が読むなら [`embed/HOWTO.md`](embed/HOWTO.md)、
+**大規模言語モデルの助手に読ませるなら** [`embed/flute-embed.md`](embed/flute-embed.md) である。
+判断を伴う部分は手順書の側にあるので、プログラムだけでは埋め込みを再現できない。
 
 **核心は、笛の外形の凸包でホスト側にポケットを彫り抜いてから笛を戻すことである。**
 これをやらないと、ホストの材料が笛の空洞を埋めて鳴らない。
@@ -132,7 +139,7 @@ cd decoder && for t in fft_peak silence_segmenter tempo_filter cipher_codec; do
 ```bibtex
 @inproceedings{cipherflute2026,
   author    = {栗原 一貴},
-  title     = {CipherFlute: 3Dプリントした笛の音の高さによる秘密の保管},
+  title     = {CipherFlute：特別な装置なしに復号できる3Dプリント笛による秘密情報の日用品への埋め込み},
   booktitle = {WISS 2026},
   year      = {2026},
   note      = {投稿中}

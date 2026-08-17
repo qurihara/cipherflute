@@ -3,6 +3,12 @@
 このリポジトリの中身は、断りがなければ [LICENSE](LICENSE)（コード）と
 [LICENSE-assets](LICENSE-assets)（3Dデータ・写真）に従う。以下は例外と注意である。
 
+## 書体を用いた作例（かるたの読み札）
+
+`gallery/models/karuta_2of2.3mf` の文字は、SIL Open Font License の毛筆書体
+Yuji Syuku で組んである。**同梱してあるのは文字の輪郭を立体にした造形データであり、
+フォントファイルそのものは含めていない。**歌は12世紀のもので、権利の保護期間を過ぎている。
+
 ## 絵画を用いた作例（画像タイル）
 
 `gallery/photos/tiles_*.jpg` に写っているのは、葛飾北斎「富嶽三十六景 神奈川沖浪裏」を

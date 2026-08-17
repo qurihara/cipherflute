@@ -44,7 +44,8 @@ fixture.vectors.filter(v => v.no_repeat).forEach((vector, index) => {
 
 // データ記号数が不正な笛列(RS的には無矛盾のd=1)はエラーになることを確認する。
 {
-  const cfg = Object.assign({}, config, {ecc_parity: 2, mode: "sequential"});
+  // 差分の写像を使わない作り（no_repeat: false）を前提にした検査なので、既定に頼らず明示する。
+  const cfg = Object.assign({}, config, {ecc_parity: 2, mode: "sequential", no_repeat: false});
   const table = codec.slots(cfg);
   const {wb, p, w} = codec._wireParams(cfg, table.length);
   const wire = codec._rsEncode([5], 2, p);

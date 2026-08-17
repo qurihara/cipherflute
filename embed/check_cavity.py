@@ -35,7 +35,7 @@ import trimesh
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
-from fue.check_cavity import load_segments  # noqa: E402
+from gcode_segments import load_segments  # noqa: E402
 
 
 def bed_matrix(three_mf: str) -> np.ndarray:

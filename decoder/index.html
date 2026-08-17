@@ -365,6 +365,9 @@ const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 const el = id => document.getElementById(id);
 let audioCtx, analyser, raf, running=false;
 let micStream = null;      // マイクの生の流れ。その場の録音（節2''）に渡す
+// [* 紹介動画を作るための入口]。demoaudio= に音声ファイルを渡すと、マイクの代わりに
+// それを流し込んで解析する。1本ずつ音名が出ていく画をそのまま録画できる。
+let demoAudioUrl = null, demoAudioEl = null;
 let freqData;
 let live = {freq:0, peak:0, bandDb:-120};
 let cipherConfig = null;
@@ -389,6 +392,9 @@ const segOptions = {};  // 無音区切りの調整（gap= onmargin= minnote=）
     const v = q.get(name);
     if(v !== null && /^\d+(\.\d+)?$/.test(v)) segOptions[key] = parseFloat(v);
   };
+  // [* 実演の録画を音源にする（紹介動画用）]。`demoaudio=<音声のURL>` を渡すと
+  // マイクを開かず、その音を流しながらまったく同じ道で解析する。
+  demoAudioUrl = q.get("demoaudio");
   num("gap", "gapMs");            // 区切りとみなす無音の長さ[ms]。つまみの初期値になる
   if(segOptions.gapMs){
     el("gapRange").value = String(Math.max(60, Math.min(400, segOptions.gapMs)));
@@ -535,10 +541,32 @@ function foldIntoRange(f){
 async function start(){
   if(running) return true;
   try{
-    const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
-    micStream = stream;          // その場の録音（節2''）でも使うので持っておく
     audioCtx = new (window.AudioContext||window.webkitAudioContext)();
-    const src = audioCtx.createMediaStreamSource(stream);
+    let src;
+    if(demoAudioUrl){
+      // [* 実演の録画を音源にする（紹介動画を作るための入口）]。マイクの代わりに
+      // 音声ファイルを流し込む。**解析の道はマイクとまったく同じ**なので、1本ずつ
+      // 音名が出ていく様子がそのまま撮れる。録音ファイルの読み込み（節2''）は
+      // OfflineAudioContext で一気に解いてしまうため、途中経過が映らず使えない。
+      const a = new Audio(demoAudioUrl);
+      a.crossOrigin = "anonymous";
+      demoAudioEl = a;
+      window.__demoAudio = a;              // 録画の段取りを外から確かめられるように
+      // 録画の前に、音が解析へ届いているかを外から確かめられるようにする
+      window.__dbg = () => ({ctx: audioCtx.state, running: running, active: auto.active,
+                             seq: auto.seq.length, peak: (function(){
+                               if(!analyser || !freqData) return null;
+                               analyser.getFloatFrequencyData(freqData);
+                               let m = -Infinity; for(const v of freqData) if(v > m) m = v;
+                               return Math.round(m);
+                             })()});
+      src = audioCtx.createMediaElementSource(a);
+      src.connect(audioCtx.destination);   // 何を流しているか耳でも分かるように
+    }else{
+      const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+      micStream = stream;        // その場の録音（節2''）でも使うので持っておく
+      src = audioCtx.createMediaStreamSource(stream);
+    }
     // [* 窓は4096にする]（v13）。8192（約186ms）だと、息を切らずに続けて吹いたときの
     // 音の変わり目が窓の中で平均化され、2本の笛が1つに繋がる。録音の側で分かったことを
     // マイクにも合わせた。4096なら約93msで変わり目を追える。
@@ -547,8 +575,16 @@ async function start(){
     freqData = new Float32Array(analyser.frequencyBinCount);
     running = true;
     el("startBtn").style.display = "none";
-    el("status").textContent = "準備完了。先頭の基準笛から順に吹いてください。";
+    el("status").textContent = demoAudioUrl
+      ? "実演の録画を音源にしています（デモ）。"
+      : "準備完了。先頭の基準笛から順に吹いてください。";
     loop();
+    // [* AudioContext は止まった状態で始まる]。マイクのときは getUserMedia が
+    // 利用者の操作を伴うので勝手に動き出すが、音声ファイルではそれが無い。
+    // 明示的に起こさないと、解析の輪は回るのに音が一切届かない。
+    // ★ここでは再生しない★ ページを開いた時点で流すと、区切りの判定を始める前に
+    // 音が終わってしまう。再生は autoStart（節2の開始）に任せる。
+    if(demoAudioEl){ try{ await audioCtx.resume(); }catch(_){} }
     return true;
   }catch(e){
     // 自動起動がブラウザに拒否された場合は、操作ボタンで再度促す
@@ -1063,6 +1099,13 @@ async function autoStart(){
   el("autoHint").textContent="部屋の静けさを測っています。少しだけ静かにしてください。";
   autoSetButton();
   renderAutoSeq();
+  if(demoAudioEl){
+    // [* 実演の録画を流すのはここ]。静けさを測っている間に音が来ると、暗騒音を
+    // 高く見積もってしまい、以降の音が「鳴っていない」と判定される。測り終わる
+    // 頃合いを見て頭出しから流す。
+    demoAudioEl.pause(); demoAudioEl.currentTime = 0;
+    setTimeout(() => { demoAudioEl.play().catch(()=>{}); }, 900);
+  }
   return true;
 }
 function autoStop(){
@@ -1445,7 +1488,10 @@ function loop(){
       el("beatDot").textContent = idx+1;
     }
   }
-  raf = requestAnimationFrame(loop);
+  // [* 実演の録画を流すときは時計を替える]。requestAnimationFrame は、タブが前面に
+  // ないと止まる。音だけが進んで解析が一切回らず、何も検出されないまま終わる
+  // （2026-08-14 にこれで丸ごと1回無駄にした）。デモのときは setTimeout で回す。
+  raf = demoAudioUrl ? setTimeout(loop, 16) : requestAnimationFrame(loop);
 }
 
 // --- base64url ---
