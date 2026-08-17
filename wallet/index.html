@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>暗号笛ウォレット（Polygon Amoy）</title>
+<style>
+  :root{ --bg:#0f1220; --card:#1a1f36; --fg:#e8ecf5; --muted:#98a2c0;
+         --accent:#5b8cff; --ok:#37c98a; --warn:#ffb454; --ng:#ff6b6b; --line:#2b3255; }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+       background:var(--bg);color:var(--fg);line-height:1.6}
+  .wrap{max-width:680px;margin:0 auto;padding:20px 16px 60px}
+  h1{font-size:1.35rem;margin:.2em 0}
+  h2{font-size:1.05rem;margin:1.4em 0 .5em;color:var(--accent)}
+  p.lead{color:var(--muted);margin:.2em 0 1em}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0}
+  button{font:inherit;border:none;border-radius:9px;padding:.7em 1.1em;cursor:pointer;color:#fff;background:var(--accent)}
+  button.sec{background:#2b335c} button.ok{background:var(--ok)} button:disabled{opacity:.45;cursor:default}
+  .muted{color:var(--muted);font-size:.9rem}
+  .status{font-size:.9rem;color:var(--warn);min-height:1.4em}
+  .notice{background:#2a2033;border:1px solid var(--warn);border-left-width:5px;border-radius:10px;
+          padding:14px 16px;margin:14px 0;font-size:.92rem;line-height:1.75}
+  .notice b{color:var(--warn)}
+  .addr{font-family:ui-monospace,Menlo,monospace;font-size:.95rem;word-break:break-all;color:var(--ok)}
+  .bal{font-size:2rem;font-weight:800;font-variant-numeric:tabular-nums}
+  .seq{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .chip{background:#0c0f1d;border:1px solid var(--line);border-radius:9px;padding:.4em .7em;text-align:center;min-width:64px}
+  .chip .idx{font-size:.7rem;color:var(--muted)}
+  .chip .nm{font-size:1rem;font-weight:700;color:var(--accent)}
+  .meter{display:flex;align-items:baseline;gap:.5em;justify-content:center;margin:.3em 0}
+  .hz{font-size:1.8rem;font-weight:700;font-variant-numeric:tabular-nums}
+  .note{font-size:1.8rem;font-weight:700;color:var(--accent)}
+  a{color:var(--accent)}
+  .locked{opacity:.35;pointer-events:none}
+  input.wide{width:100%;background:#0c0f1d;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:.55em;
+             font-family:ui-monospace,Menlo,monospace}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>暗号笛ウォレット</h1>
+  <p class="lead">笛を吹くと、その場で秘密鍵が組み立てられ、自分の口座が現れます。鍵はどこにも保存されません。ページを閉じれば消えます。ネットワークは Polygon Amoy（テストネット）です。</p>
+
+  <div class="notice">
+    <b>デモンストレーション用です。本物の資産には使わないでください。</b>
+    <ul style="margin:.5em 0 0;padding-left:1.3em">
+      <li>Amoy はテストネットで、そこのトークンに金銭的な価値はありません。</li>
+      <li>笛が運ぶ秘密が小さいと、口座のアドレスから<b>総当たりで秘密鍵に到達できます</b>。カード1枚（約21ビット）は総当たりできる大きさです。価値のあるものを預けてよいのは128ビット級（スプール2枚）だけです。</li>
+      <li>ブラウザの拡張機能や画面の記録からは守れません。金額の大きい用途では専用の端末を使ってください。</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button id="micBtn">マイクを開始</button>
+      <span class="status" id="micStatus">笛を吹くにはマイクの許可が要ります。</span>
+    </div>
+    <div class="meter"><span class="hz"><span id="hz">–</span><span style="font-size:.8rem;color:var(--muted)"> Hz</span></span>
+      <span class="note" id="noteName">–</span></div>
+  </div>
+
+  <h2>1. 笛を吹いて口座を開く</h2>
+  <div class="card">
+    <div class="muted">「開始」を押して笛を順に吹きます。息を切るか音が変わったところで自動的に次の笛へ進みます。吹き終えたらもう一度押してください。<br>
+      2枚組（2-of-2）の場合は、1枚目を確定してから2枚目を吹きます。<b>2枚そろうまで口座は現れません。</b></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0">
+      <label class="muted" for="mode">笛の種類：</label>
+      <select id="mode" style="font:inherit;background:#0c0f1d;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:.4em">
+        <option value="single">1枚（カード8本・パリティ1）</option>
+        <option value="pair" selected>2枚組（2-of-2 のハートカード）</option>
+        <option value="spool">スプール2枚（128ビット・49本）</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button id="blowBtn">開始</button>
+      <button class="sec" id="skipBtn" disabled>この笛は飛ばす</button>
+      <button class="sec" id="undoBtn" disabled>1本取り消す</button>
+      <button class="sec" id="resetBtn">やり直す</button>
+    </div>
+    <div class="seq" id="seq"></div>
+    <span class="status" id="blowStatus"></span>
+  </div>
+
+  <h2>2. 口座</h2>
+  <div class="card" id="acctCard">
+    <div class="muted">合言葉（笛と合わせて2要素にします。空にすると笛だけで決まります）
+      <input class="wide" id="pass" value="demo" spellcheck="false" autocomplete="off">
+      <span class="muted">★合言葉を変えると別の口座になります★ 笛が同じでも、合言葉が違えば別の口座です。</span></div>
+    <div class="muted" style="margin-top:12px">アドレス</div>
+    <div class="addr" id="addr">笛を吹くと現れます</div>
+    <div class="muted" style="margin-top:12px">残高</div>
+    <div class="bal"><span id="bal">–</span> <span style="font-size:1rem;color:var(--muted)">POL</span></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+      <button class="sec" id="refreshBtn" disabled>残高を読み直す</button>
+      <button class="sec" id="forgetBtn" disabled>鍵を忘れる</button>
+    </div>
+    <div class="muted" style="margin-top:10px">受け取りは笛なしでできます。このアドレスを相手に伝えるだけです。送るときだけ笛が要ります。
+      テスト用トークンは <a href="https://www.alchemy.com/faucets/polygon-amoy" target="_blank" rel="noopener">Alchemyの蛇口</a>
+      や <a href="https://faucet.quicknode.com/polygon/amoy" target="_blank" rel="noopener">QuickNodeの蛇口</a> から入れられます（Polygon公式の蛇口は終了しました）。</div>
+    <div class="muted" style="margin-top:10px">接続先（RPC）
+      <input class="wide" id="rpc" value="https://polygon-amoy-bor-rpc.publicnode.com" list="rpcList" spellcheck="false">
+      <datalist id="rpcList">
+        <option value="https://polygon-amoy-bor-rpc.publicnode.com"></option>
+        <option value="https://rpc-amoy.polygon.technology"></option>
+        <option value="https://polygon-amoy.drpc.org"></option>
+      </datalist>
+      <span class="muted">繋がらないときは別の接続先を選んでください。どれもPolygon Amoy（chainId 80002）です。</span></div>
+    <span class="status" id="acctStatus"></span>
+  </div>
+
+  <h2>3. 送る</h2>
+  <div class="card locked" id="sendCard">
+    <div class="muted">宛先（0xで始まる42文字）
+      <input class="wide" id="to" placeholder="0x…" spellcheck="false" autocomplete="off"></div>
+    <div class="muted" style="margin-top:10px">金額（POL）
+      <input class="wide" id="amount" placeholder="0.01" spellcheck="false" autocomplete="off"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+      <button class="sec" id="prepareBtn" disabled>内容を確かめる</button>
+      <button id="sendBtn" disabled>この内容で署名して送る</button>
+    </div>
+    <div id="review" style="display:none;margin-top:12px;padding:12px;border:1px solid var(--line);border-radius:8px">
+      <div class="muted">★これから署名する内容★</div>
+      <table style="margin-top:8px;font-size:0.95rem">
+        <tr><td class="muted" style="padding-right:12px">送り主</td><td class="addr" id="rvFrom"></td></tr>
+        <tr><td class="muted" style="padding-right:12px">宛先</td><td class="addr" id="rvTo"></td></tr>
+        <tr><td class="muted" style="padding-right:12px">金額</td><td id="rvValue"></td></tr>
+        <tr><td class="muted" style="padding-right:12px">手数料の上限</td><td id="rvFee"></td></tr>
+        <tr><td class="muted" style="padding-right:12px">合わせて要る額</td><td id="rvTotal"></td></tr>
+        <tr><td class="muted" style="padding-right:12px">通し番号</td><td id="rvNonce"></td></tr>
+        <tr><td class="muted" style="padding-right:12px">チェーン</td><td id="rvChain"></td></tr>
+      </table>
+    </div>
+    <span class="status" id="sendStatus"></span>
+    <div class="muted" style="margin-top:10px">★これは実験です★ カード1枚の秘密は20.8bitしかないので、
+      このアドレスが公開の台帳に現れた時点で、総当たりで秘密鍵に到達されます。テストネットのトークンには
+      金銭価値が無いので損害は出ませんが、<a href="DESIGN.md">同じ作りを本番のチェーンで使ってはいけません</a>。</div>
+  </div>
+
+  <p class="muted">鍵の作り方は <a href="flute_key.js">flute_key.js</a>（PBKDF2 60万回・salt は「版｜ラベル」・合言葉は秘密の側に混ぜる）。送金は <a href="tx.js">tx.js</a>（EIP-1559の取引をこの場で組み立てて署名します。財布アプリは使いません）。音の復号は <a href="../decoder/cipher_codec.js">cipher_codec.js</a>。設計の検討は <a href="DESIGN.md">DESIGN.md</a>。外部のCDNは使わず、必要なライブラリは <a href="vendor/">vendor/</a> に置いています。</p>
+</div>
+
+<script src="../decoder/cipher_codec.js"></script>
+<script src="../decoder/silence_segmenter.js"></script>
+<script src="../decoder/fft_peak.js"></script>
+<script type="module">
+import { deriveAccount } from "./flute_key.js";
+import { buildTransfer, signTransaction, sendRaw, maxFeeWei,
+         parseEther, formatEther } from "./tx.js";
+
+const CHAIN_ID = 80002n;                       // Polygon Amoy
+const EXPLORER = "https://amoy.polygonscan.com/tx/";
+
+const el = (id) => document.getElementById(id);
+const CFG_BASE = {lo_note:"G#6", hi_note:"G7", step_cents:100, reference_note:"C7",
+                  no_repeat:true, use_reference:true};
+const MODES = {
+  single: {label:"カード1枚",     cfg:{...CFG_BASE, ecc_parity:1, mode:"symbols"}, cards:1, expect:8},
+  pair:   {label:"2枚組",         cfg:{...CFG_BASE, ecc_parity:1, mode:"symbols"}, cards:2, expect:8},
+  spool:  {label:"スプール2枚",   cfg:{...CFG_BASE, ecc_parity:2, mode:"sequential"}, cards:1, expect:49},
+};
+
+// --- マイクと音程 ---
+/* ★音の高さは山を追って読む（自己相関は使わない）★
+ *
+ * 以前はここで自己相関にもとづく検出（pitchy）を使っていた。ところがその方式は
+ * [* 符号の最低音 G#6（1661Hz）に 3992Hz という無関係な値を、高い確からしさとともに返す]。
+ * 復号ページは v13 でこれをやめ、笛の音域の中でいちばん強い山を追う方式に移った。
+ * このページも同じ関数（FftPeak.peakInBand）を使う。読み方が2つあると、同じ笛が
+ * ページによって別の音に読まれてしまう。
+ */
+const LO_HZ = 1479, HI_HZ = 3520;   // 笛の音域（G#6の下からG7の上まで）に少し余白を取る
+const MIC_ON_DB = -75;              // 山がこれより強ければ鳴っているとみなす
+let ac, analyser, freqData, running = false;
+async function startMic(){
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+    ac = new (window.AudioContext||window.webkitAudioContext)();
+    const src = ac.createMediaStreamSource(stream);
+    analyser = ac.createAnalyser(); analyser.fftSize = 4096; analyser.smoothingTimeConstant = 0;
+    src.connect(analyser);
+    freqData = new Float32Array(analyser.frequencyBinCount);
+    running = true; loop();
+    el("micStatus").textContent = "マイクが動いています。";
+    el("micBtn").disabled = true;
+    return true;
+  }catch(e){
+    el("micStatus").textContent = "マイクを開始できませんでした（" + e.message + "）";
+    return false;
+  }
+}
+function loop(){
+  if(!running) return;
+  analyser.getFloatFrequencyData(freqData);
+  const binHz = ac.sampleRate / analyser.fftSize;
+  const pk = window.FftPeak.peakInBand(freqData, binHz, LO_HZ, HI_HZ);
+  const good = !!(pk && pk.level > MIC_ON_DB);
+  const pitch = good ? pk.freq : 0;
+  const db = pk ? pk.level : -120;
+  el("hz").textContent = good ? pitch.toFixed(1) : "–";
+  el("noteName").textContent = good ? noteOf(pitch) : "–";
+  // 区切り検出へ流す。時刻・音量(dB)・いま聞こえている高さ、の順で渡す仕様である。
+  if(seg && active){
+    const ev = seg.feed(performance.now() - t0, db, good ? pitch : 0);
+    if(ev.type === "note"){
+      seq.push({freq: ev.freq, note: noteOf(ev.freq)});
+      renderSeq();
+      if(navigator.vibrate) navigator.vibrate(20);
+    }else if(ev.type === "calibrating"){
+      el("blowStatus").textContent = "部屋の静けさを測っています。少しだけ静かにしてください。";
+    }else if(ev.type === "idle" && seq.length === 0){
+      el("blowStatus").textContent = "準備できました。1本目を吹いてください。";
+    }
+  }
+  requestAnimationFrame(loop);
+}
+function noteOf(freq){
+  return window.CipherCodec.midiToNote(Math.round(69 + 12*Math.log2(freq/440)));
+}
+
+// --- 吹いて記号を読む ---
+let seg = null, active = false, seq = [], cards = [], t0 = 0;
+function renderSeq(){
+  const box = el("seq"); box.innerHTML = "";
+  cards.forEach((c,i)=>{
+    const d = document.createElement("div"); d.className = "chip";
+    d.innerHTML = '<div class="idx">' + (i+1) + '枚目</div><div class="nm">読取済</div>';
+    box.appendChild(d);
+  });
+  seq.forEach((s,i)=>{
+    const d = document.createElement("div"); d.className = "chip";
+    d.innerHTML = '<div class="idx">' + (i+1) + '</div><div class="nm">' + (s.skipped ? "—" : s.note) + '</div>';
+    box.appendChild(d);
+  });
+  const m = MODES[el("mode").value];
+  el("blowBtn").textContent = active ? "終了して読む"
+      : (cards.length ? (cards.length+1) + "枚目を吹く" : "開始");
+  el("blowBtn").classList.toggle("ok", active);
+  el("skipBtn").disabled = !active; el("undoBtn").disabled = !(active && seq.length);
+}
+async function blowStart(){
+  if(!running && !await startMic()) return;
+  seg = window.SilenceSegmenter.create({gapMs:100, pitchSplitCents:80, pitchStableMs:70,
+                                        minNoteMs:120, endMs:Number.MAX_SAFE_INTEGER});
+  active = true; seq = []; t0 = performance.now();
+  el("blowStatus").textContent = "吹いてください。";
+  renderSeq();
+}
+function blowEnd(){
+  active = false;
+  const m = MODES[el("mode").value];
+  const freqs = seq.map(s => s.skipped ? window.CipherCodec.noteToFreq(CFG_BASE.lo_note)/2 : s.freq);
+  seg = null;
+  if(!freqs.length){ el("blowStatus").textContent = "1本も入っていません。"; renderSeq(); return; }
+  const r = window.CipherCodec.decode(freqs, m.cfg, true);
+  if(r.status.startsWith("error:")){
+    el("blowStatus").textContent = "読めませんでした（" + r.status + "）。もう一度吹いてください。";
+    seq = []; renderSeq(); return;
+  }
+  cards.push(m.cfg.mode === "symbols" ? {symbols:r.symbols} : {payload:r.payload});
+  seq = [];
+  el("blowStatus").textContent = cards.length + "枚目を読み取りました（" + r.status + "）。"
+      + (cards.length < m.cards ? "続けて次の1枚を吹いてください。" : "");
+  renderSeq();
+  if(cards.length >= m.cards) openAccount();
+}
+function blowToggle(){ active ? blowEnd() : blowStart(); }
+
+// --- 口座を開く ---
+let account = null;
+async function openAccount(){
+  const m = MODES[el("mode").value];
+  let secret;
+  try{
+    if(m.cfg.mode === "symbols"){
+      const table = window.CipherCodec.slots(m.cfg);
+      const base = window.CipherCodec._wireParams(m.cfg, table.length).mb;
+      secret = m.cards === 2
+        ? window.CipherCodec.combineShares(cards.map(c=>c.symbols), base).digits
+        : cards[0].symbols;
+    }else{
+      secret = cards[0].payload;
+    }
+  }catch(e){ el("blowStatus").textContent = "合わせられません（" + e.message + "）"; return; }
+
+  el("acctStatus").textContent = "鍵を組み立てています…";
+  account = await deriveAccount(secret, {label: "amoy", passphrase: el("pass").value});
+  el("addr").textContent = account.address;
+  el("refreshBtn").disabled = false; el("forgetBtn").disabled = false;
+  el("prepareBtn").disabled = false;
+  el("sendCard").classList.remove("locked");
+  el("acctStatus").textContent = account.hasPassphrase
+    ? "合言葉を混ぜた口座です。" : "★合言葉なしの口座です★ 笛だけで決まります。";
+  refresh();
+}
+async function rpc(method, params){
+  const res = await fetch(el("rpc").value.trim(), {
+    method:"POST", headers:{"content-type":"application/json"},
+    body: JSON.stringify({jsonrpc:"2.0", id:1, method, params}),
+  });
+  const j = await res.json();
+  if(j.error) throw new Error(j.error.message);
+  return j.result;
+}
+async function refresh(){
+  if(!account) return;
+  el("acctStatus").textContent = "残高を読んでいます…";
+  try{
+    const wei = BigInt(await rpc("eth_getBalance", [account.address, "latest"]));
+    const whole = wei / 10n**18n, frac = (wei % 10n**18n).toString().padStart(18,"0").slice(0,6);
+    el("bal").textContent = whole.toString() + "." + frac;
+    el("acctStatus").textContent = "";
+  }catch(e){
+    el("acctStatus").textContent = "残高を読めませんでした（" + e.message + "）。接続先を確かめてください。";
+  }
+}
+function forget(){
+  account = null; cards = []; seq = []; active = false; seg = null; prepared = null;
+  el("addr").textContent = "笛を吹くと現れます"; el("bal").textContent = "–";
+  el("refreshBtn").disabled = true; el("forgetBtn").disabled = true;
+  el("prepareBtn").disabled = true; el("sendBtn").disabled = true;
+  el("sendCard").classList.add("locked");
+  el("review").style.display = "none";
+  el("blowStatus").textContent = ""; el("sendStatus").textContent = "";
+  el("acctStatus").textContent = "鍵を忘れました。";
+  renderSeq();
+}
+
+// --- 送る ---
+// 押しただけで送らない。まず内容を組み立てて画面に出し、人が読んでから署名する。
+let prepared = null;
+async function prepare(){
+  if(!account) return;
+  prepared = null; el("sendBtn").disabled = true; el("review").style.display = "none";
+  let to, valueWei;
+  try{
+    to = el("to").value.trim();
+    if(!/^0x[0-9a-fA-F]{40}$/.test(to)) throw new Error("宛先は0xで始まる42文字です");
+    valueWei = parseEther(el("amount").value);
+    if(valueWei <= 0n) throw new Error("金額は0より大きくしてください");
+  }catch(e){ el("sendStatus").textContent = e.message; return; }
+
+  el("sendStatus").textContent = "いまの手数料を調べています…";
+  try{
+    const tx = await buildTransfer(rpc, {from: account.address, to, valueWei, chainId: CHAIN_ID});
+    const fee = maxFeeWei(tx);
+    const bal = BigInt(await rpc("eth_getBalance", [account.address, "latest"]));
+    el("rvFrom").textContent = account.address;
+    el("rvTo").textContent = to;
+    el("rvValue").textContent = formatEther(valueWei) + " POL";
+    el("rvFee").textContent = formatEther(fee) + " POL（使わなかった分は返ります）";
+    el("rvTotal").textContent = formatEther(valueWei + fee) + " POL ／ 残高 " + formatEther(bal) + " POL";
+    el("rvNonce").textContent = tx.nonce.toString();
+    el("rvChain").textContent = "Polygon Amoy（chainId " + tx.chainId + "）";
+    el("review").style.display = "";
+    if(bal < valueWei + fee){
+      el("sendStatus").textContent = "★残高が足りません★ 手数料を含めて " + formatEther(valueWei + fee) + " POL 要ります。";
+      return;
+    }
+    prepared = tx;
+    el("sendBtn").disabled = false;
+    el("sendStatus").textContent = "内容を確かめて、よければ送ってください。";
+  }catch(e){
+    el("sendStatus").textContent = "組み立てられませんでした（" + e.message + "）。接続先を確かめてください。";
+  }
+}
+async function send(){
+  if(!prepared || !account) return;
+  el("sendBtn").disabled = true;
+  el("sendStatus").textContent = "署名しています…";
+  try{
+    const {raw, hash} = await signTransaction(prepared, account.privateKey);
+    el("sendStatus").textContent = "送っています…";
+    const sent = await sendRaw(rpc, raw);
+    el("sendStatus").innerHTML = "送りました。取引 <a href=\"" + EXPLORER + sent +
+      "\" target=\"_blank\" rel=\"noopener\">" + sent.slice(0,18) + "…</a>（台帳に載るまで少し待ちます）";
+    prepared = null; el("review").style.display = "none";
+    setTimeout(refresh, 5000);
+  }catch(e){
+    el("sendStatus").textContent = "送れませんでした（" + e.message + "）";
+    el("sendBtn").disabled = false;
+  }
+}
+
+el("micBtn").onclick = startMic;
+el("blowBtn").onclick = blowToggle;
+el("resetBtn").onclick = forget;
+el("forgetBtn").onclick = forget;
+el("refreshBtn").onclick = refresh;
+el("prepareBtn").onclick = prepare;
+el("sendBtn").onclick = send;
+// 合言葉を変えたら別の口座になるので、いまの鍵は捨てる。
+el("pass").onchange = () => { if(account) forget(); };
+el("skipBtn").onclick = ()=>{ if(active){ seq.push({skipped:true}); renderSeq(); } };
+el("undoBtn").onclick = ()=>{ if(seq.length){ seq.pop(); renderSeq(); } };
+el("mode").onchange = forget;
+renderSeq();
+</script>
+</body>
+</html>
