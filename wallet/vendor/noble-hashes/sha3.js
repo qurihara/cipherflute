@@ -9,7 +9,7 @@
  * Check out `sha3-addons` module for cSHAKE, k12, and others.
  * @module
  */
-import { rotlBH, rotlBL, rotlSH, rotlSL, split } from "./_u64.js";
+import { rotlBH, rotlBL, rotlSH, rotlSL, split } from "./u64.js?v=2";
 // prettier-ignore
 import { abytes, aexists, anumber, aoutput, clean, createHasher, createXOFer, Hash, swap32IfBE, toBytes, u32 } from "./utils.js";
 // No __PURE__ annotations in sha3 header:

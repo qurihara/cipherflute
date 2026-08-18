@@ -14,9 +14,9 @@
  *
  * 外部ライブラリは vendor/ に置いたものだけを使う。
  */
-import { keccak_256 } from "./vendor/noble-hashes/sha3.js";
-import { signAsync, getPublicKey } from "./vendor/secp256k1.js";
-import { toHex, toChecksumAddress } from "./flute_key.js";
+import { keccak_256 } from "./vendor/noble-hashes/sha3.js?v=2";
+import { signAsync, getPublicKey } from "./vendor/secp256k1.js?v=2";
+import { toHex, toChecksumAddress } from "./flute_key.js?v=2";
 
 /* ---------------------------------------------------------------- RLP */
 

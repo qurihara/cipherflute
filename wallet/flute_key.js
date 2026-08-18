@@ -11,8 +11,8 @@
  *
  * ブラウザ（WebCrypto）とNode（node:crypto の webcrypto）の両方で動く。
  */
-import { keccak_256 } from "./vendor/noble-hashes/sha3.js";
-import { getPublicKey, CURVE } from "./vendor/secp256k1.js";
+import { keccak_256 } from "./vendor/noble-hashes/sha3.js?v=2";
+import { getPublicKey, CURVE } from "./vendor/secp256k1.js?v=2";
 
 export const KDF_VERSION = "cipherflute/v1";
 export const DEFAULT_ITERATIONS = 600000;      // OWASPの推奨値（PBKDF2-HMAC-SHA256）

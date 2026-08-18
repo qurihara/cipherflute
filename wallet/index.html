@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>暗号笛ウォレット（Polygon Amoy）</title>
+<title>CipherFlute暗号通貨ウォレット</title>
 <style>
   :root{ --bg:#0f1220; --card:#1a1f36; --fg:#e8ecf5; --muted:#98a2c0;
          --accent:#5b8cff; --ok:#37c98a; --warn:#ffb454; --ng:#ff6b6b; --line:#2b3255; }
@@ -33,83 +33,60 @@
   .note{font-size:1.8rem;font-weight:700;color:var(--accent)}
   a{color:var(--accent)}
   .locked{opacity:.35;pointer-events:none}
+  /* 口座が開いた瞬間を、紹介動画の子画面でも分かるようにする。縁が緑に変わり、一度だけ光る。 */
+  #acctCard{transition:border-color .5s, box-shadow .5s}
+  #acctCard.open{border-color:var(--ok);box-shadow:0 0 0 1px var(--ok)}
+  #acctCard.flash{animation:flash 1.2s ease-out 1}
+  @keyframes flash{ 0%{box-shadow:0 0 0 0 rgba(55,201,138,.75)} 100%{box-shadow:0 0 0 22px rgba(55,201,138,0)} }
+  #bal.live{color:var(--ok)}
   input.wide{width:100%;background:#0c0f1d;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:.55em;
              font-family:ui-monospace,Menlo,monospace}
+  /* 紹介動画を撮るとき（demoaudio=）だけ、音名の列の場所を先に空けておく。
+     空けないと本数が増えるたびに高さが変わり、動画にしたとき縦に潰れる。 */
+  body.demo .seq{min-height:108px;align-content:flex-start}
+  body.demo .status{min-height:1.4em}
+  /* メーターだけの子画面（meter=1）。口座も操作も出さず、音の高さと音名だけを大きく出す。
+     復号の成立に依存しないので、どの実演にも安全に重ねられる。 */
+  body.meteronly .wrap{max-width:400px;padding:6px 8px}
+  body.meteronly .wrap > *{display:none !important}
+  body.meteronly #blowCard{display:block !important}
+  body.meteronly #blowCard > *:not(.meter){display:none !important}
+  body.meteronly #blowCard{padding:10px 14px;margin:4px 0}
+  body.meteronly .hz,body.meteronly .note{font-size:3rem}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>暗号笛ウォレット</h1>
-  <p class="lead">笛を吹くと、その場で秘密鍵が組み立てられ、自分の口座が現れます。鍵はどこにも保存されません。ページを閉じれば消えます。ネットワークは Polygon Amoy（テストネット）です。</p>
+  <h1>CipherFlute暗号通貨ウォレット</h1>
 
-  <div class="notice">
-    <b>デモンストレーション用です。本物の資産には使わないでください。</b>
-    <ul style="margin:.5em 0 0;padding-left:1.3em">
-      <li>Amoy はテストネットで、そこのトークンに金銭的な価値はありません。</li>
-      <li>笛が運ぶ秘密が小さいと、口座のアドレスから<b>総当たりで秘密鍵に到達できます</b>。カード1枚（約21ビット）は総当たりできる大きさです。価値のあるものを預けてよいのは128ビット級（スプール2枚）だけです。</li>
-      <li>ブラウザの拡張機能や画面の記録からは守れません。金額の大きい用途では専用の端末を使ってください。</li>
-    </ul>
+  <!-- ★口座はいちばん上に置く★ 紹介動画では、この上端だけを子画面に映して
+       「笛を吹くと口座が現れ、残高が出る」ことを見せる。だから残高より上に、
+       説明や注意書きを置かない。 -->
+  <div class="card" id="acctCard">
+    <div class="muted">残高</div>
+    <div class="bal"><span id="bal">–</span> <span style="font-size:1.1rem;color:var(--muted)">POL</span></div>
+    <div class="muted" style="margin-top:10px">口座のアドレス</div>
+    <div class="addr" id="addr">笛を吹くと現れます</div>
+    <span class="status" id="acctStatus"></span>
   </div>
 
-  <div class="card">
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
-      <button id="micBtn">マイクを開始</button>
-      <span class="status" id="micStatus">笛を吹くにはマイクの許可が要ります。</span>
-    </div>
+  <div class="card" id="blowCard">
     <div class="meter"><span class="hz"><span id="hz">–</span><span style="font-size:.8rem;color:var(--muted)"> Hz</span></span>
       <span class="note" id="noteName">–</span></div>
-  </div>
-
-  <h2>1. 笛を吹いて口座を開く</h2>
-  <div class="card">
-    <div class="muted">「開始」を押して笛を順に吹きます。息を切るか音が変わったところで自動的に次の笛へ進みます。吹き終えたらもう一度押してください。<br>
-      2枚組（2-of-2）の場合は、1枚目を確定してから2枚目を吹きます。<b>2枚そろうまで口座は現れません。</b></div>
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0">
-      <label class="muted" for="mode">笛の種類：</label>
-      <select id="mode" style="font:inherit;background:#0c0f1d;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:.4em">
-        <option value="single">1枚（カード8本・パリティ1）</option>
-        <option value="pair" selected>2枚組（2-of-2 のハートカード）</option>
-        <option value="spool">スプール2枚（128ビット・49本）</option>
-      </select>
-    </div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
       <button id="blowBtn">開始</button>
       <button class="sec" id="skipBtn" disabled>この笛は飛ばす</button>
       <button class="sec" id="undoBtn" disabled>1本取り消す</button>
       <button class="sec" id="resetBtn">やり直す</button>
+      <button class="sec" id="micBtn" style="display:none">マイクを開始</button>
     </div>
     <div class="seq" id="seq"></div>
     <span class="status" id="blowStatus"></span>
+    <span class="status" id="micStatus"></span>
+    <div class="muted" id="cfgLine" style="margin-top:8px"></div>
   </div>
 
-  <h2>2. 口座</h2>
-  <div class="card" id="acctCard">
-    <div class="muted">合言葉（笛と合わせて2要素にします。空にすると笛だけで決まります）
-      <input class="wide" id="pass" value="demo" spellcheck="false" autocomplete="off">
-      <span class="muted">★合言葉を変えると別の口座になります★ 笛が同じでも、合言葉が違えば別の口座です。</span></div>
-    <div class="muted" style="margin-top:12px">アドレス</div>
-    <div class="addr" id="addr">笛を吹くと現れます</div>
-    <div class="muted" style="margin-top:12px">残高</div>
-    <div class="bal"><span id="bal">–</span> <span style="font-size:1rem;color:var(--muted)">POL</span></div>
-    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
-      <button class="sec" id="refreshBtn" disabled>残高を読み直す</button>
-      <button class="sec" id="forgetBtn" disabled>鍵を忘れる</button>
-    </div>
-    <div class="muted" style="margin-top:10px">受け取りは笛なしでできます。このアドレスを相手に伝えるだけです。送るときだけ笛が要ります。
-      テスト用トークンは <a href="https://www.alchemy.com/faucets/polygon-amoy" target="_blank" rel="noopener">Alchemyの蛇口</a>
-      や <a href="https://faucet.quicknode.com/polygon/amoy" target="_blank" rel="noopener">QuickNodeの蛇口</a> から入れられます（Polygon公式の蛇口は終了しました）。</div>
-    <div class="muted" style="margin-top:10px">接続先（RPC）
-      <input class="wide" id="rpc" value="https://polygon-amoy-bor-rpc.publicnode.com" list="rpcList" spellcheck="false">
-      <datalist id="rpcList">
-        <option value="https://polygon-amoy-bor-rpc.publicnode.com"></option>
-        <option value="https://rpc-amoy.polygon.technology"></option>
-        <option value="https://polygon-amoy.drpc.org"></option>
-      </datalist>
-      <span class="muted">繋がらないときは別の接続先を選んでください。どれもPolygon Amoy（chainId 80002）です。</span></div>
-    <span class="status" id="acctStatus"></span>
-  </div>
-
-  <h2>3. 送る</h2>
+  <h2>送る</h2>
   <div class="card locked" id="sendCard">
     <div class="muted">宛先（0xで始まる42文字）
       <input class="wide" id="to" placeholder="0x…" spellcheck="false" autocomplete="off"></div>
@@ -132,21 +109,82 @@
       </table>
     </div>
     <span class="status" id="sendStatus"></span>
-    <div class="muted" style="margin-top:10px">★これは実験です★ カード1枚の秘密は20.8bitしかないので、
-      このアドレスが公開の台帳に現れた時点で、総当たりで秘密鍵に到達されます。テストネットのトークンには
-      金銭価値が無いので損害は出ませんが、<a href="DESIGN.md">同じ作りを本番のチェーンで使ってはいけません</a>。</div>
+  </div>
+
+  <h2 id="about" style="margin-top:2.2em">設定と、このページについて</h2>
+
+  <details style="margin:14px 0">
+    <summary class="muted" style="cursor:pointer">読む笛の設定（いまの設定と、URLの書き方）</summary>
+    <div class="card" style="margin-top:8px">
+      <div class="muted">いまの設定（<b id="cfgName">—</b>）</div>
+      <div id="cfgDesc" style="margin-top:4px"></div>
+      <div class="muted" style="margin-top:10px">★この設定はURLで決まります★ 別の笛を読むときはURLを変えてください。</div>
+      <div class="muted" style="margin-top:8px;font-size:0.92rem">
+        <code>?lo=G%236&amp;hi=G7&amp;norepeat=1&amp;mode=symbols&amp;parity=1&amp;cards=2&amp;name=かるた2枚</code><br>
+        <b>lo・hi</b> 音域（#は %23 と書く）／<b>parity</b> パリティ記号の数／<b>mode</b> symbols か sequential／
+        <b>norepeat</b> 隣接同音の禁止（1で有効）／<b>cards</b> 何枚吹くか／<b>expect</b> 1枚あたりの本数／
+        <b>shares</b> 担体の総数（k-of-n の n。指定すると番号を総当たりするので、どれを吹いたか覚えていなくてよい）／<b>name</b> 画面に出す名前／<b>label</b> 口座のラベル（変えると同じ笛から別の口座になる）／
+        <b>ref・step・useref</b> 基準笛・刻み・基準笛を使うか。<br>
+        復号ページと同じ書き方です。台帳のURLの <code>#</code> から後ろをそのまま貼れば読めます。
+        <b>★設定が違っても読めてしまうことがあります★</b> その場合は黙って別の口座が開きます
+        （たとえばパリティ2の札をパリティ1で読むと、エラーにならないまま違う値になります）。
+      </div>
+      <div class="muted" style="margin-top:10px">よく使う設定：
+        <a href="?lo=G%236&hi=G7&norepeat=1&mode=symbols&parity=1&cards=1&expect=8&name=%E3%81%8B%E3%82%8B%E3%81%9F%E3%83%BB%E3%83%8F%E3%83%BC%E3%83%88%E3%81%AE1%E6%9E%9A">かるた・ハートの1枚</a> ／
+        <a href="?lo=G%236&hi=G7&norepeat=1&mode=symbols&parity=1&cards=2&expect=8&name=2-of-2%EF%BC%882%E6%9E%9A%E7%B5%84%EF%BC%89">2枚組（2-of-2）</a> ／
+        <a href="?lo=G%236&hi=G7&norepeat=1&mode=symbols&parity=2&cards=1&expect=8&name=2-of-3%E3%81%AE%E6%96%AD%E7%89%871%E3%81%A4">2-of-3の断片1つ</a> ／
+        <a href="?lo=G%236&hi=G7&norepeat=1&mode=symbols&parity=2&cards=2&expect=8&shares=3&name=2-of-3%EF%BC%883%E3%81%A4%E3%81%AE%E3%81%86%E3%81%A12%E3%81%A4%EF%BC%89">2-of-3（どの2つでも）</a> ／
+        <a href="?lo=G%236&hi=G7&norepeat=1&mode=symbols&parity=2&cards=1&expect=9&name=%E5%8C%97%E6%96%8E%E3%81%AE%E3%82%BF%E3%82%A4%E3%83%AB1%E6%9E%9A">北斎のタイル1枚</a> ／
+        <a href="?lo=G%236&hi=G7&norepeat=1&mode=symbols&parity=2&cards=2&expect=9&shares=9&name=2-of-9%EF%BC%889%E6%9E%9A%E3%81%AE%E3%81%A9%E3%82%8C2%E6%9E%9A%E3%81%A7%E3%82%82%EF%BC%89">2-of-9（どの2枚でも）</a> ／
+        <a href="?lo=G%236&hi=G7&norepeat=1&mode=sequential&parity=2&cards=1&expect=49&name=%E3%82%B9%E3%83%97%E3%83%BC%E3%83%AB2%E6%9E%9A%EF%BC%88128%E3%83%93%E3%83%83%E3%83%88%EF%BC%89">スプール2枚（128ビット）</a>
+      </div>
+    </div>
+  </details>
+
+  <details style="margin:14px 0">
+    <summary class="muted" style="cursor:pointer">合言葉・接続先・受け取り方</summary>
+    <div class="card" style="margin-top:8px">
+      <div class="muted">合言葉（笛と合わせて2要素にします。空にすると笛だけで決まります）
+        <input class="wide" id="pass" value="demo" spellcheck="false" autocomplete="off">
+        <span class="muted">★合言葉を変えると別の口座になります★ 笛が同じでも、合言葉が違えば別の口座です。</span></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+        <button class="sec" id="refreshBtn" disabled>残高を読み直す</button>
+        <button class="sec" id="forgetBtn" disabled>鍵を忘れる</button>
+      </div>
+      <div class="muted" style="margin-top:12px">接続先（RPC）
+        <input class="wide" id="rpc" value="https://polygon-amoy-bor-rpc.publicnode.com" list="rpcList" spellcheck="false">
+        <datalist id="rpcList">
+          <option value="https://polygon-amoy-bor-rpc.publicnode.com"></option>
+          <option value="https://polygon-amoy.drpc.org"></option>
+        </datalist>
+        <span class="muted">繋がらないときは別の接続先を選んでください。どれも Polygon Amoy（chainId 80002）です。</span></div>
+      <div class="muted" style="margin-top:12px">受け取りは笛なしでできます。アドレスを相手に伝えるだけです。送るときだけ笛が要ります。
+        テスト用トークンは <a href="https://www.alchemy.com/faucets/polygon-amoy" target="_blank" rel="noopener">Alchemyの蛇口</a>
+        や <a href="https://faucet.quicknode.com/polygon/amoy" target="_blank" rel="noopener">QuickNodeの蛇口</a> から入れられます。</div>
+    </div>
+  </details>
+
+  <div class="notice">
+    <b>デモンストレーション用です。本物の資産には使わないでください。</b>
+    <ul style="margin:.5em 0 0;padding-left:1.3em">
+      <li>Amoy はテストネットで、そこのトークンに金銭的な価値はありません。</li>
+      <li>笛が運ぶ秘密が小さいと、口座のアドレスから<b>総当たりで秘密鍵に到達できます</b>。カード1枚（約21ビット）は総当たりできる大きさです。価値のあるものを預けてよいのは128ビット級（スプール2枚）だけです。遅い鍵導出（PBKDF2 60万回）は1候補あたりの費用を上げるだけで、足りない情報量は補いません。</li>
+      <li>合言葉を混ぜれば2要素になりますが、<b>この画面の既定 <code>demo</code> は公開されている</b>ので強度は上がりません。実際に使うなら自分の合言葉に変えてください。</li>
+      <li>ブラウザの拡張機能や画面の記録からは守れません。金額の大きい用途では専用の端末を使ってください。</li>
+      <li>笛という物体そのものに秘密を守る力はありません。保管場所を知られた場合は、吹かなくても計測や透過撮影で読み取れます。</li>
+    </ul>
   </div>
 
   <p class="muted">鍵の作り方は <a href="flute_key.js">flute_key.js</a>（PBKDF2 60万回・salt は「版｜ラベル」・合言葉は秘密の側に混ぜる）。送金は <a href="tx.js">tx.js</a>（EIP-1559の取引をこの場で組み立てて署名します。財布アプリは使いません）。音の復号は <a href="../decoder/cipher_codec.js">cipher_codec.js</a>。設計の検討は <a href="DESIGN.md">DESIGN.md</a>。外部のCDNは使わず、必要なライブラリは <a href="vendor/">vendor/</a> に置いています。</p>
 </div>
 
-<script src="../decoder/cipher_codec.js"></script>
-<script src="../decoder/silence_segmenter.js"></script>
-<script src="../decoder/fft_peak.js"></script>
+<script src="../decoder/cipher_codec.js?v=2"></script>
+<script src="../decoder/silence_segmenter.js?v=2"></script>
+<script src="../decoder/fft_peak.js?v=2"></script>
 <script type="module">
-import { deriveAccount } from "./flute_key.js";
+import { deriveAccount } from "./flute_key.js?v=2";
 import { buildTransfer, signTransaction, sendRaw, maxFeeWei,
-         parseEther, formatEther } from "./tx.js";
+         parseEther, formatEther } from "./tx.js?v=2";
 
 const CHAIN_ID = 80002n;                       // Polygon Amoy
 const EXPLORER = "https://amoy.polygonscan.com/tx/";
@@ -154,11 +192,74 @@ const EXPLORER = "https://amoy.polygonscan.com/tx/";
 const el = (id) => document.getElementById(id);
 const CFG_BASE = {lo_note:"G#6", hi_note:"G7", step_cents:100, reference_note:"C7",
                   no_repeat:true, use_reference:true};
-const MODES = {
-  single: {label:"カード1枚",     cfg:{...CFG_BASE, ecc_parity:1, mode:"symbols"}, cards:1, expect:8},
-  pair:   {label:"2枚組",         cfg:{...CFG_BASE, ecc_parity:1, mode:"symbols"}, cards:2, expect:8},
-  spool:  {label:"スプール2枚",   cfg:{...CFG_BASE, ecc_parity:2, mode:"sequential"}, cards:1, expect:49},
-};
+
+/* ★読む笛の設定はURLで決まる★
+ *
+ * 一覧から選ぶ作りにしていたが、[* 物が増えるたびに選択肢が増え、第三者が自分の笛を
+ * 読めない]。復号ページ（docs/cipher/）と同じパラメータの書き方にして、URLで指定する。
+ * 台帳に載せているURLの # から後ろをそのまま貼れば読める。
+ *
+ * 検索の側（?）と断片の側（#）のどちらでも受ける。断片で書くと、設定がサーバの記録に
+ * 残らない。台帳のURLに合わせるならこちらである。
+ */
+const MODE = (function readConfig(){
+  const search = new URLSearchParams(location.search);
+  const frag = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const q = (name) => frag.has(name) ? frag.get(name) : search.get(name);
+  const cfg = {...CFG_BASE, ecc_parity: 1, mode: "symbols"};
+  const noteRe = /^[A-Ga-g][#b]?-?\d+$/;
+  const lo = q("lo"), hi = q("hi"), ref = q("ref"), step = q("step");
+  if(lo && noteRe.test(lo)) cfg.lo_note = lo;
+  if(hi && noteRe.test(hi)) cfg.hi_note = hi;
+  if(ref && noteRe.test(ref)) cfg.reference_note = ref;
+  if(step !== null && /^\d+(\.\d+)?$/.test(step ?? "")) cfg.step_cents = parseFloat(step);
+  const mode = q("mode");
+  if(mode === "symbols" || mode === "sequential") cfg.mode = mode;
+  const parity = q("parity");
+  if(parity !== null && /^\d+$/.test(parity ?? "")) cfg.ecc_parity = parseInt(parity, 10);
+  const norepeat = q("norepeat");
+  if(norepeat === "0" || norepeat === "false") cfg.no_repeat = false;
+  const useref = q("useref");
+  if(useref === "0" || useref === "false") cfg.use_reference = false;
+  const cards = parseInt(q("cards") ?? "2", 10);
+  const expect = parseInt(q("expect") ?? "8", 10);
+  // shares は担体の総数（k-of-n の n）。指定があると、しきい値秘密分散として読む。
+  // 番号は総当たりするので、どれを吹いたかを持ち主が覚えている必要はない。
+  const shares = parseInt(q("shares") ?? "0", 10);
+  return {
+    cfg,
+    cards: Number.isFinite(cards) && cards >= 1 ? cards : 2,
+    expect: Number.isFinite(expect) && expect >= 1 ? expect : 8,
+    shares: Number.isFinite(shares) && shares >= 2 ? shares : 0,
+    label: q("label") || "amoy",
+    name: q("name") || "指定なし（既定の設定）",
+    // 紹介動画を撮るための入口。マイクの代わりに、この音声を流して同じ道で解析する。
+    demoAudio: q("demoaudio") || null,
+    // meter=1 で、音の高さと音名だけの表示にする（子画面用）。
+    meter: q("meter") === "1",
+    // 鳴っているとみなす山の強さ[dB]。素材の物音が強いときに引き上げる。
+    onDb: parseFloat(q("ondb") ?? "") || null,
+    dropDb: parseFloat(q("dropdb") ?? "") || null,
+  };
+})();
+
+if(MODE.demoAudio) document.body.classList.add("demo");
+if(MODE.meter) document.body.classList.add("meteronly");
+
+// いまの設定を画面に出す。何を読もうとしているのかが分からないまま吹かせない。
+// 上には1行だけ置き、細かい中身は末尾の折りたたみに送る（紹介動画で上端だけを映すため）。
+(function showConfig(){
+  const c = MODE.cfg;
+  const kofn = MODE.shares ? `／${MODE.cards}-of-${MODE.shares}（担体の番号は総当たり）` : "";
+  const detail =
+    `音域 ${c.lo_note}〜${c.hi_note}／基準笛 ${c.reference_note}／パリティ ${c.ecc_parity}記号／`
+    + `${c.mode === "symbols" ? "記号" : "バイト列"}／隣接同音の禁止 ${c.no_repeat ? "あり" : "なし"}／`
+    + `${MODE.cards}枚 × 各${MODE.expect}本${kofn}／口座のラベル ${MODE.label}`;
+  el("cfgName").textContent = MODE.name;
+  el("cfgDesc").textContent = detail;
+  el("cfgLine").textContent = `${MODE.name}　${MODE.cards}枚 × 各${MODE.expect}本`
+    + (MODE.shares ? `（${MODE.shares}枚のうちどれでも）` : "");
+})();
 
 // --- マイクと音程 ---
 /* ★音の高さは山を追って読む（自己相関は使わない）★
@@ -171,21 +272,43 @@ const MODES = {
  */
 const LO_HZ = 1479, HI_HZ = 3520;   // 笛の音域（G#6の下からG7の上まで）に少し余白を取る
 const MIC_ON_DB = -75;              // 山がこれより強ければ鳴っているとみなす
-let ac, analyser, freqData, running = false;
+/* いちばん強い笛からこれ以上小さい音は物音とみなす。実測では、本物の笛が18〜40dB、
+   物音が-7〜5dBで、あいだが広く空いている。25を既定にすると両側とも取りこぼさない。
+   素材によっては URLの dropdb= で調節する。 */
+const DROP_DB = 25;
+let peakDb = -Infinity;             // いま鳴っている音の、これまででいちばん強いところ
+let loudest = -Infinity;            // この録音で拾った笛の、いちばん強いところ
+let ac, analyser, freqData, running = false, demoAudioEl = null;
 async function startMic(){
   try{
-    const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
     ac = new (window.AudioContext||window.webkitAudioContext)();
-    const src = ac.createMediaStreamSource(stream);
+    let src;
+    if(MODE.demoAudio){
+      /* ★実演の録画を音源にする（紹介動画を作るための入口）★
+       * マイクの代わりに音声ファイルを流し込む。解析の道はマイクとまったく同じなので、
+       * 1本ずつ音名が出て、そろうと口座が現れる様子がそのまま撮れる。
+       * 復号ページ（docs/cipher/）の demoaudio= と同じ仕掛けである。 */
+      const a = new Audio(MODE.demoAudio);
+      a.crossOrigin = "anonymous";
+      demoAudioEl = a;
+      window.__demoAudio = a;            // 録画の段取りを外から確かめられるように
+      src = ac.createMediaElementSource(a);
+      src.connect(ac.destination);       // 何を流しているか耳でも分かるように
+    }else{
+      const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}});
+      src = ac.createMediaStreamSource(stream);
+    }
     analyser = ac.createAnalyser(); analyser.fftSize = 4096; analyser.smoothingTimeConstant = 0;
     src.connect(analyser);
     freqData = new Float32Array(analyser.frequencyBinCount);
     running = true; loop();
-    el("micStatus").textContent = "マイクが動いています。";
-    el("micBtn").disabled = true;
+    el("micStatus").textContent = "";
+    el("micBtn").style.display = "none";
     return true;
   }catch(e){
-    el("micStatus").textContent = "マイクを開始できませんでした（" + e.message + "）";
+    // 自動で始められないブラウザもある。そのときだけボタンを出して操作を促す。
+    el("micBtn").style.display = "";
+    el("micStatus").textContent = "マイクを使うには許可が要ります。「マイクを開始」を押してください。";
     return false;
   }
 }
@@ -194,25 +317,68 @@ function loop(){
   analyser.getFloatFrequencyData(freqData);
   const binHz = ac.sampleRate / analyser.fftSize;
   const pk = window.FftPeak.peakInBand(freqData, binHz, LO_HZ, HI_HZ);
-  const good = !!(pk && pk.level > MIC_ON_DB);
+  const good = !!(pk && pk.level > (MODE.onDb ?? MIC_ON_DB));
   const pitch = good ? pk.freq : 0;
   const db = pk ? pk.level : -120;
-  el("hz").textContent = good ? pitch.toFixed(1) : "–";
-  el("noteName").textContent = good ? noteOf(pitch) : "–";
+  /* 口座が開いたら、音の高さの表示は止める。吹き終えたあとの残響や物音を拾って
+     数字が動き続けると、映像では「吹いていないのに動いている」ように見える。 */
+  const showLive = !(MODE.demoAudio && account);
+  el("hz").textContent = (good && showLive) ? pitch.toFixed(1) : "–";
+  el("noteName").textContent = (good && showLive) ? noteOf(pitch) : "–";
   // 区切り検出へ流す。時刻・音量(dB)・いま聞こえている高さ、の順で渡す仕様である。
   if(seg && active){
+    // 鳴っている最中のいちばん強いところを覚えておく。1本ぶんが確定したときに、
+    // それが本物の笛か物音かを見分けるのに使う（区切り器は音量を返さない）。
+    if(good) peakDb = Math.max(peakDb, db);
     const ev = seg.feed(performance.now() - t0, db, good ? pitch : 0);
     if(ev.type === "note"){
-      seq.push({freq: ev.freq, note: noteOf(ev.freq)});
-      renderSeq();
-      if(navigator.vibrate) navigator.vibrate(20);
+      /* ★物音を笛と取り違えない★
+       * 実演では、札を持ち替えるときの物音を拾うことがある。本物の笛は20〜38dBだが、
+       * 物音は2〜5dBで、はっきり差がある。いちばん強い笛から DROP_DB 以上小さい音は
+       * 捨てる。捨てないと本数がずれ、口座が開かない（demo_2of2 で実際に起きた）。
+       * 録画の音源を読むときだけ効かせる。マイクで吹くときは、その場で吹き直せばよい。 */
+      const thisPeak = peakDb; peakDb = -Infinity;
+      loudest = Math.max(loudest, thisPeak);
+      // 列が空でも判定する。1枚目を確定した直後の1本は、まさに持ち替えの物音に当たる。
+      const dropDb = MODE.dropDb || DROP_DB;
+      const noise = MODE.demoAudio && loudest > -Infinity && thisPeak < loudest - dropDb;
+      /* ★先に拾った弱い音を、あとから捨て直す★
+       * 1本目には比べる相手がいないので、冒頭の物音は必ず通ってしまう。あとから
+       * 本物の笛（ずっと強い）が来た時点で、それより DROP_DB 以上弱いものを列から外す。
+       * 外さないと本数がずれ、記号が1つずつずれて別の口座が開く（demo_box で実際に起きた）。 */
+      if(MODE.demoAudio && !noise && seq.length){
+        // ★入れ物ごと作り直さず、中身を詰め替える★ seq は他からも参照されているので、
+        // 別の配列に差し替えると、そちらが古い中身を持ったままになる。
+        const kept = seq.filter(x => x.peak === undefined || x.peak >= loudest - dropDb);
+        if(kept.length !== seq.length){
+          seq.length = 0;
+          for(const x of kept) seq.push(x);
+          renderSeq();
+        }
+      }
+      if(!noise){
+        seq.push({freq: ev.freq, note: noteOf(ev.freq), peak: thisPeak});
+        window.__seqPeaks = seq.map(x => x.peak);   // 録画から強さを確かめられるように
+        renderSeq();
+        if(navigator.vibrate) navigator.vibrate(20);
+        /* ★録画のときは、1枚ぶんたまったところで自動的に確定する★
+         * 人が吹くときは1枚ごとに「終了して読む」を押すが、録画では音を通しで流すので
+         * 押す人がいない。本数で区切って次の1枚へ移る。
+         *
+         * [* 区切り器は作り直さない。] 作り直すと暗騒音の測り直し（0.4秒）が入り、
+         * その間の音を落とす。落ちたぶんは後からまとめて出るので、映像では
+         * 「吹いていないのに音名が出る」ように見えてしまう。 */
+        if(MODE.demoAudio && seq.length >= MODE.expect) setTimeout(demoAdvance, 0);
+      }
     }else if(ev.type === "calibrating"){
       el("blowStatus").textContent = "部屋の静けさを測っています。少しだけ静かにしてください。";
     }else if(ev.type === "idle" && seq.length === 0){
       el("blowStatus").textContent = "準備できました。1本目を吹いてください。";
     }
   }
-  requestAnimationFrame(loop);
+  // ★タブが前面にないと requestAnimationFrame が止まる★ 録画のときは音だけが先へ進み、
+  // 解析が一度も回らないまま終わってしまう。エラーも出ないので気づきにくい。
+  if(MODE.demoAudio) setTimeout(loop, 16); else requestAnimationFrame(loop);
 }
 function noteOf(freq){
   return window.CipherCodec.midiToNote(Math.round(69 + 12*Math.log2(freq/440)));
@@ -232,7 +398,7 @@ function renderSeq(){
     d.innerHTML = '<div class="idx">' + (i+1) + '</div><div class="nm">' + (s.skipped ? "—" : s.note) + '</div>';
     box.appendChild(d);
   });
-  const m = MODES[el("mode").value];
+  const m = MODE;
   el("blowBtn").textContent = active ? "終了して読む"
       : (cards.length ? (cards.length+1) + "枚目を吹く" : "開始");
   el("blowBtn").classList.toggle("ok", active);
@@ -248,7 +414,7 @@ async function blowStart(){
 }
 function blowEnd(){
   active = false;
-  const m = MODES[el("mode").value];
+  const m = MODE;
   const freqs = seq.map(s => s.skipped ? window.CipherCodec.noteToFreq(CFG_BASE.lo_note)/2 : s.freq);
   seg = null;
   if(!freqs.length){ el("blowStatus").textContent = "1本も入っていません。"; renderSeq(); return; }
@@ -266,31 +432,120 @@ function blowEnd(){
 }
 function blowToggle(){ active ? blowEnd() : blowStart(); }
 
+/** 録画のとき、1枚ぶんを確定して次の1枚へ移る。区切り器と吹き取りは続けたままにする。 */
+function demoAdvance(){
+  const m = MODE;
+  if(!active || seq.length < m.expect) return;
+  const freqs = seq.map(s => s.skipped ? window.CipherCodec.noteToFreq(CFG_BASE.lo_note)/2 : s.freq);
+  const r = window.CipherCodec.decode(freqs, m.cfg, true);
+  if(r.status.startsWith("error:")){
+    el("blowStatus").textContent = "読めませんでした（" + r.status + "）。";
+    seq = []; renderSeq(); return;
+  }
+  cards.push(m.cfg.mode === "symbols" ? {symbols:r.symbols} : {payload:r.payload});
+  seq = [];
+  el("blowStatus").textContent = cards.length + "枚目を読み取りました（" + r.status + "）。"
+      + (cards.length < m.cards ? "続けて次の1枚を吹いてください。" : "");
+  renderSeq();
+  if(cards.length >= m.cards){ active = false; seg = null; openAccount(); }
+}
+
+/* ★k-of-n では、担体の番号を総当たりする★
+ *
+ * しきい値秘密分散の断片は「番号 x における多項式の値」なので、番号が分からないと
+ * 復元できない。番号を取り違えても[* エラーにならず、違う値が出る]。
+ *
+ * とはいえ番号を覚えておくのは不便である。そこで、吹いた笛にどの番号を割り当てるかを
+ * 総当たりし、[* 残高が入っている口座が見つかったらそれを採る]。2枚で n=9 なら
+ * 9×8=72通りで、鍵導出が1回90ミリ秒なので数秒で終わる。
+ *
+ * 番号を知らなくても自分の口座に辿り着けるので、持ち主は物を吹くだけでよい。
+ */
+function* numberings(n, k){
+  // 1..n から重複なく k 個を選ぶ並び（順序が違えば別の割り当てになる）
+  const cur = [];
+  function* rec(){
+    if(cur.length === k){ yield cur.slice(); return; }
+    for(let x = 1; x <= n; x++){
+      if(cur.includes(x)) continue;
+      cur.push(x); yield* rec(); cur.pop();
+    }
+  }
+  yield* rec();
+}
+async function findByNumbering(base, passphrase){
+  const C = window.CipherCodec;
+  const total = MODE.shares;
+  // まず秘密の候補を作る。ここは計算だけなので速い。同じ値は1つにまとめる。
+  const seen = new Map();
+  for(const xs of numberings(total, cards.length)){
+    let digits;
+    try{
+      digits = C.combineThreshold(cards.map((c, i) => ({x: xs[i], symbols: c.symbols})), base).digits;
+    }catch(e){ continue; }
+    const key = digits.join(",");
+    if(!seen.has(key)) seen.set(key, {digits, xs});
+  }
+  const cands = [...seen.values()];
+  // 次に、候補ごとに口座を作って残高を見る。鍵導出が重いので進み具合を出す。
+  let i = 0;
+  for(const cand of cands){
+    i++;
+    el("acctStatus").textContent = `どの担体かを探しています… ${i}/${cands.length}`;
+    const a = await deriveAccount(cand.digits, {label: MODE.label, passphrase});
+    let wei = 0n;
+    try{ wei = BigInt(await rpc("eth_getBalance", [a.address, "latest"])); }catch(e){ /* 次を試す */ }
+    if(wei > 0n) return {account: a, xs: cand.xs, tried: i, total: cands.length};
+  }
+  return null;
+}
+
 // --- 口座を開く ---
 let account = null;
 async function openAccount(){
-  const m = MODES[el("mode").value];
+  const m = MODE;
+  const pass = el("pass").value;
+  account = null;                 // 吹き直したときに前の口座が残らないようにする
   let secret;
   try{
     if(m.cfg.mode === "symbols"){
       const table = window.CipherCodec.slots(m.cfg);
       const base = window.CipherCodec._wireParams(m.cfg, table.length).mb;
-      secret = m.cards === 2
-        ? window.CipherCodec.combineShares(cards.map(c=>c.symbols), base).digits
-        : cards[0].symbols;
+      if(m.shares){
+        // k-of-n。番号が分からないので総当たりする。
+        const hit = await findByNumbering(base, pass);
+        if(!hit){
+          el("acctStatus").textContent = "";
+          el("blowStatus").textContent =
+            "この組み合わせでは口座が見つかりませんでした。吹き直すか、担体の数（URLの shares）を確かめてください。";
+          return;
+        }
+        account = hit.account;
+        el("blowStatus").textContent =
+          `担体${hit.xs.join("と")}の組で開きました（${hit.total}通りのうち${hit.tried}番目）。`;
+      }else{
+        secret = m.cards >= 2
+          ? window.CipherCodec.combineShares(cards.map(c=>c.symbols), base).digits
+          : cards[0].symbols;
+      }
     }else{
       secret = cards[0].payload;
     }
   }catch(e){ el("blowStatus").textContent = "合わせられません（" + e.message + "）"; return; }
 
-  el("acctStatus").textContent = "鍵を組み立てています…";
-  account = await deriveAccount(secret, {label: "amoy", passphrase: el("pass").value});
+  if(!account){
+    el("acctStatus").textContent = "鍵を組み立てています…";
+    account = await deriveAccount(secret, {label: MODE.label, passphrase: pass});
+  }
   el("addr").textContent = account.address;
   el("refreshBtn").disabled = false; el("forgetBtn").disabled = false;
   el("prepareBtn").disabled = false;
   el("sendCard").classList.remove("locked");
-  el("acctStatus").textContent = account.hasPassphrase
-    ? "合言葉を混ぜた口座です。" : "★合言葉なしの口座です★ 笛だけで決まります。";
+  el("acctStatus").textContent = "";
+  // 口座が開いた瞬間を見せる。紹介動画では、この上端だけを子画面に映す。
+  const card = el("acctCard");
+  card.classList.add("open");
+  card.classList.remove("flash"); void card.offsetWidth; card.classList.add("flash");
   refresh();
 }
 async function rpc(method, params){
@@ -309,6 +564,7 @@ async function refresh(){
     const wei = BigInt(await rpc("eth_getBalance", [account.address, "latest"]));
     const whole = wei / 10n**18n, frac = (wei % 10n**18n).toString().padStart(18,"0").slice(0,6);
     el("bal").textContent = whole.toString() + "." + frac;
+    el("bal").classList.add("live");
     el("acctStatus").textContent = "";
   }catch(e){
     el("acctStatus").textContent = "残高を読めませんでした（" + e.message + "）。接続先を確かめてください。";
@@ -317,12 +573,14 @@ async function refresh(){
 function forget(){
   account = null; cards = []; seq = []; active = false; seg = null; prepared = null;
   el("addr").textContent = "笛を吹くと現れます"; el("bal").textContent = "–";
+  el("bal").classList.remove("live");
+  el("acctCard").classList.remove("open", "flash");
   el("refreshBtn").disabled = true; el("forgetBtn").disabled = true;
   el("prepareBtn").disabled = true; el("sendBtn").disabled = true;
   el("sendCard").classList.add("locked");
   el("review").style.display = "none";
   el("blowStatus").textContent = ""; el("sendStatus").textContent = "";
-  el("acctStatus").textContent = "鍵を忘れました。";
+  el("acctStatus").textContent = "";
   renderSeq();
 }
 
@@ -393,8 +651,37 @@ el("sendBtn").onclick = send;
 el("pass").onchange = () => { if(account) forget(); };
 el("skipBtn").onclick = ()=>{ if(active){ seq.push({skipped:true}); renderSeq(); } };
 el("undoBtn").onclick = ()=>{ if(seq.length){ seq.pop(); renderSeq(); } };
-el("mode").onchange = forget;
 renderSeq();
+
+// ページを開いたら自動でマイクを開く。実演のたびに許可を押させないためである。
+// ブラウザに拒否されたときだけ「マイクを開始」のボタンが現れる。
+startMic();
+
+/* ★紹介動画を撮るときの段取り★
+ * demoaudio= を渡されたときは、外から window.__startDemo() を呼ぶと、吹き取りを始めて
+ * 音声を流す。録画の側は、その時刻を起点に子画面を出せばよい。
+ * 自分で勝手に始めないのは、録画の開始と音の頭を合わせたいからである。
+ */
+window.__startDemo = async () => {
+  if(!MODE.demoAudio) throw new Error("demoaudio= が指定されていない");
+  if(!running) await startMic();
+  if(!active) await blowStart();
+  await demoAudioEl.play();
+  return {started: true, duration: demoAudioEl.duration};
+};
+/* 音が終わったら、吹き終えたものとして読む（人が押す「終了して読む」の代わり）。
+ * ★すぐには読まない。★ 区切り器は「無音が続いたら1本確定」という作りなので、
+ * 最後の音が音源の終わりまで鳴っていると、その1本が確定しないまま終わる。
+ * 音が止まったあとの無音を聞かせるために少し待つ（実際、待たないと最後の1本が
+ * 落ちて box_2of3 と card_2026724 が読めなかった）。 */
+if(MODE.demoAudio){
+  const t = setInterval(() => {
+    if(demoAudioEl && demoAudioEl.ended && active){
+      clearInterval(t);
+      setTimeout(() => { if(active) blowEnd(); }, 700);
+    }
+  }, 200);
+}
 </script>
 </body>
 </html>
