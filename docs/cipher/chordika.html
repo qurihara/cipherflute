@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chordika 調識別</title>
+<style>
+  :root{
+    --bg:#0f1220; --card:#1a1f36; --fg:#e8ecf5; --muted:#98a2c0;
+    --accent:#5b8cff; --ok:#37c98a; --warn:#ffb454; --ng:#ff6b6b; --line:#2b3255;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+       background:var(--bg);color:var(--fg);line-height:1.6}
+  .wrap{max-width:680px;margin:0 auto;padding:20px 16px 60px}
+  h1{font-size:1.35rem;margin:.2em 0}
+  h2{font-size:1.05rem;margin:1.4em 0 .5em;color:var(--accent)}
+  p.lead{color:var(--muted);margin:.2em 0 1em}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0}
+  button{font:inherit;border:none;border-radius:9px;padding:.7em 1.1em;cursor:pointer;color:#fff;background:var(--accent)}
+  button.sec{background:#2b335c}
+  button.ok{background:var(--ok)}
+  button:disabled{opacity:.45;cursor:default}
+  .meter{display:flex;align-items:baseline;gap:.5em;justify-content:center;margin:.3em 0}
+  .hz{font-size:2.2rem;font-weight:700;font-variant-numeric:tabular-nums}
+  .note{font-size:2.2rem;font-weight:700;color:var(--accent)}
+  .cents{font-size:1rem;color:var(--muted)}
+  .muted{color:var(--muted);font-size:.9rem}
+  .status{font-size:.9rem;color:var(--warn);min-height:1.4em}
+  .clar{height:6px;background:#0c0f1d;border-radius:4px;overflow:hidden;margin-top:6px}
+  .clar > i{display:block;height:100%;width:0;background:var(--ok)}
+  select{font:inherit;background:#0c0f1d;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:.4em}
+  a{color:var(--accent)}
+
+  /* push-to-talk */
+  .ptt{width:100%;padding:1.4em 1em;font-size:1.2rem;font-weight:700;background:var(--accent);
+       border-radius:14px;touch-action:none;user-select:none;-webkit-user-select:none}
+  .ptt.rec{background:var(--ng)}
+  .beatwrap{display:flex;align-items:center;gap:16px;justify-content:center;margin:14px 0 6px;min-height:64px}
+  .beatdot{width:54px;height:54px;border-radius:50%;background:#2b335c;transition:transform .05s,background .05s;
+           display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700}
+  .beatdot.on{background:var(--ok);transform:scale(1.18)}
+  .seq{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .chip{background:#0c0f1d;border:1px solid var(--line);border-radius:9px;padding:.4em .7em;font-variant-numeric:tabular-nums;text-align:center;min-width:74px}
+  .chip .idx{font-size:.7rem;color:var(--muted)}
+  .chip .nm{font-size:1.1rem;font-weight:700;color:var(--accent)}
+  .chip .fz{font-size:.75rem;color:var(--muted)}
+  .chip.tonic{border-color:var(--warn)}
+  .chip.tonic .idx{color:var(--warn)}
+  .chip.empty .nm{color:var(--ng)}
+
+  /* 識別結果 */
+  .result{text-align:center;padding:10px 4px}
+  .keybig{font-size:2.6rem;font-weight:800;color:var(--ok);line-height:1.2;margin:.1em 0}
+  .keysub{color:var(--muted);font-size:.95rem}
+  .prog{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:12px 0 4px}
+  .prog .deg{background:#0c0f1d;border:1px solid var(--line);border-radius:9px;padding:.5em .7em;min-width:64px;text-align:center}
+  .prog .deg .rn{font-size:.75rem;color:var(--muted)}
+  .prog .deg .ch{font-size:1.15rem;font-weight:700;color:var(--accent)}
+  .prog .deg.playing{border-color:var(--ok);background:#12261d}
+  .fail{color:var(--ng);font-weight:700;text-align:center;font-size:1.1rem}
+  .okmark{color:var(--ok);font-weight:700}
+  .ngmark{color:var(--ng);font-weight:700}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Chordika 調識別</h1>
+  <p class="lead">Chordika（ハーモニカ風のカード笛）1枚の8本を、押しながら左から順に1本ずつ吹くと、絶対音程からその調（キー）を当てて、コード進行 I–V–vi–IV を鳴らします。マイクだけで動きます。基準の笛は使いません。</p>
+
+  <div class="card">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button id="startBtn">マイク開始</button>
+      <span class="status" id="status">「マイク開始」を押してマイクを許可してください。</span>
+    </div>
+    <div class="meter"><span class="hz"><span id="hz">–</span><span style="font-size:.9rem;color:var(--muted)"> Hz</span></span>
+      <span class="note" id="noteName">–</span><span class="cents" id="cents"></span></div>
+    <div class="clar"><i id="clarBar"></i></div>
+    <div class="muted" style="margin-top:6px">今鳴っている音の目安です。各笛がここにきちんと出るのを確かめてから測ると確実です。</div>
+  </div>
+
+  <h2>1. 8本を順番に吹いて測る（押しながら吹く）</h2>
+  <div class="card">
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+      <label class="muted" for="spf">1本あたりの時間：</label>
+      <select id="spf">
+        <option value="0.7">0.7秒</option>
+        <option value="1.0" selected>1.0秒</option>
+        <option value="1.5">1.5秒</option>
+        <option value="2.0">2.0秒</option>
+      </select>
+      <span class="muted">拍が切り替わったら次の笛へ。全部で8本です。</span>
+    </div>
+    <div class="beatwrap">
+      <div class="beatdot" id="beatDot">–</div>
+      <div class="muted" id="beatHint" style="max-width:300px">押した瞬間に左端の笛を吹き始め、緑に光るたびに次の笛へ移ります。8本目を吹いたら指を離してください。</div>
+    </div>
+    <button class="ptt" id="pttBtn" disabled>押しながら順に吹く</button>
+    <div class="seq" id="seq"></div>
+    <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="sec" id="clearBtn">やり直す</button>
+      <span class="status" id="capStatus"></span>
+    </div>
+  </div>
+
+  <h2>2. 調を識別する</h2>
+  <div class="card">
+    <div id="resultBox" class="result">
+      <div class="muted">8本を吹くと、ここに識別した調が表示されます。</div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:center">
+      <button class="ok" id="playBtn" disabled>識別された調のコード進行を再生</button>
+      <button class="sec" id="stopBtn" disabled>停止</button>
+    </div>
+  </div>
+
+  <p class="muted">音の並びは12調のパターンと照合します。左から4本目（位置4）がその調の主音です。復号の共通ロジックは <a href="cipher_codec.js">cipher_codec.js</a> を利用。音程検出は <a href="https://github.com/ianprime0509/pitchy" target="_blank">pitchy</a>。測定・較正ツールは <a href="../">こちら</a>、CipherFlute復号は <a href="index.html">こちら</a>。</p>
+</div>
+
+<script src="cipher_codec.js"></script>
+<script type="module">
+import { PitchDetector } from "https://esm.sh/pitchy@4";
+
+// --- このページで使うスロット設定（cipher_config.jsonは使わず固定） ---
+const CFG = { lo_note:"G#6", hi_note:"G#7", step_cents:100, reference_note:"C7", ecc_parity:0, mode:"symbols", use_reference:false };
+
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const el = id => document.getElementById(id);
+let audioCtx, analyser, detector, inputBuf, raf, running=false;
+let freqData;
+let live = {freq:0, clarity:0, peak:0};
+
+const CC = window.CipherCodec;
+const SLOTS = CC.slots(CFG);                                   // 13スロット G#6..G#7
+const loFloorHz = CC.noteToFreq(CFG.lo_note) * Math.pow(2, -2/12);  // ≈1480Hz未満は暗騒音として無視
+
+// 周波数 f を、絶対音程（比を取らない）で最も近いスロットに丸める
+function nearestSlot(f){
+  let bi = 0, bc = Infinity;
+  for(const s of SLOTS){
+    const c = Math.abs(1200 * Math.log2(f / s.freq_hz));
+    if(c < bc){ bc = c; bi = s.index; }
+  }
+  return bi;
+}
+function noteSlot(n){ return nearestSlot(CC.noteToFreq(n)); }
+
+// --- Chordika 全12枚（左→右の8本。位置4＝主音） ---
+const CARDS = [
+  {label:"C / Am",   tonic:"C",  notes:["D7","F7","A6","C7","E7","G7","B6","D7"]},
+  {label:"G / Em",   tonic:"G",  notes:["A6","C7","E7","G7","B6","D7","F#7","A6"]},
+  {label:"D / Bm",   tonic:"D",  notes:["E7","G7","B6","D7","F#7","A6","C#7","E7"]},
+  {label:"A / F#m",  tonic:"A",  notes:["B6","D7","F#7","A6","C#7","E7","G#6","B6"]},
+  {label:"E / C#m",  tonic:"E",  notes:["F#7","A6","C#7","E7","G#6","B6","D#7","F#7"]},
+  {label:"B / G#m",  tonic:"B",  notes:["C#7","E7","G#6","B6","D#7","F#7","A#6","C#7"]},
+  {label:"F# / D#m", tonic:"F#", notes:["G#6","B6","D#7","F#7","A#6","C#7","F7","G#6"]},
+  {label:"Db / Bbm", tonic:"Db", notes:["D#7","F#7","A#6","C#7","F7","G#6","C7","D#7"]},
+  {label:"Ab / Fm",  tonic:"Ab", notes:["A#6","C#7","F7","G#6","C7","D#7","G7","A#6"]},
+  {label:"Eb / Cm",  tonic:"Eb", notes:["F7","G#6","C7","D#7","G7","A#6","D7","F7"]},
+  {label:"Bb / Gm",  tonic:"Bb", notes:["C7","D#7","G7","A#6","D7","F7","A6","C7"]},
+  {label:"F / Dm",   tonic:"F",  notes:["G7","A#6","D7","F7","A6","C7","E7","G7"]},
+];
+// 各カードの8音をスロット番号列に変換しておく
+CARDS.forEach(c => { c.slots = c.notes.map(noteSlot); });
+
+// 主音（音名）→ ピッチクラス 0..11（C=0）
+const PC = {C:0,"C#":1,Db:1,D:2,"D#":3,Eb:3,E:4,F:5,"F#":6,Gb:6,G:7,"G#":8,Ab:8,A:9,"A#":10,Bb:10,B:11};
+
+function freqToNote(f){
+  if(!f) return null;
+  const midiFloat = 69 + 12*Math.log2(f/440);
+  const midi = Math.round(midiFloat);
+  const cents = Math.round((midiFloat - midi)*100);
+  const name = NOTE_NAMES[(midi%12+12)%12] + (Math.floor(midi/12)-1);
+  return {midi, cents, name};
+}
+
+async function start(){
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(stream);
+    analyser = new AnalyserNode(audioCtx,{fftSize:8192});
+    src.connect(analyser);
+    detector = PitchDetector.forFloat32Array(analyser.fftSize);
+    inputBuf = new Float32Array(detector.inputLength);
+    freqData = new Float32Array(analyser.frequencyBinCount);
+    running = true;
+    el("startBtn").disabled = true;
+    el("pttBtn").disabled = false;
+    el("status").textContent = "準備完了。左端の笛から順に8本吹いてください。";
+    loop();
+  }catch(e){
+    el("status").textContent = "マイクにアクセスできません: " + e.message;
+  }
+}
+
+// --- push-to-talk 逐次キャプチャ（index.html と同じ考え方） ---
+const cap = {active:false, t0:0, windowIndex:0, fs:[], ps:[], seq:[]};
+
+function windowFund(){
+  const median = arr => arr.length ? arr.slice().sort((a,b)=>a-b)[Math.floor(arr.length/2)] : null;
+  if(cap.fs.length>=4) return median(cap.fs);   // pitchy（楽音の基音）を優先
+  if(cap.ps.length>=4) return median(cap.ps);   // 苦手な高音はFFTピークで補完
+  return null;
+}
+
+function finalizeWindow(){
+  const f = windowFund();
+  cap.seq.push({freq: f, note: f ? freqToNote(f) : null});
+  cap.fs = []; cap.ps = [];
+  renderSeq();
+  if(navigator.vibrate) navigator.vibrate(25);
+}
+
+function beginCapture(){
+  if(!running){ el("capStatus").textContent="先にマイクを開始してください。"; return; }
+  cap.active=true; cap.t0=performance.now(); cap.windowIndex=0; cap.fs=[]; cap.ps=[]; cap.seq=[];
+  el("pttBtn").classList.add("rec"); el("pttBtn").textContent="…吹いてください（離すと識別）";
+  el("capStatus").textContent="";
+  stopChord();
+  el("playBtn").disabled=true; el("stopBtn").disabled=true;
+  el("resultBox").innerHTML='<div class="muted">測定中…</div>';
+  renderSeq();
+}
+
+function endCapture(){
+  if(!cap.active) return;
+  cap.active=false;
+  // 未確定の最後の窓を、ある程度サンプルがあれば確定する
+  if(cap.fs.length>=3 || cap.ps.length>=3) finalizeWindow();
+  el("pttBtn").classList.remove("rec"); el("pttBtn").textContent="押しながら順に吹く";
+  el("beatDot").classList.remove("on"); el("beatDot").textContent="–";
+  // 末尾の無音窓（吹き終わって離すまでの空白）を落とす
+  while(cap.seq.length && cap.seq[cap.seq.length-1].freq==null) cap.seq.pop();
+  renderSeq();
+  identify();
+}
+
+function renderSeq(){
+  const box = el("seq"); box.innerHTML="";
+  cap.seq.forEach((s,i)=>{
+    const div = document.createElement("div");
+    div.className = "chip" + (i===3?" tonic":"") + (s.freq==null?" empty":"");
+    div.innerHTML = `<div class="idx">${i+1}${i===3?" 主音":""}</div>`+
+      `<div class="nm">${s.note?s.note.name:"—"}</div>`+
+      `<div class="fz">${s.freq?Math.round(s.freq)+"Hz":"無音"}</div>`;
+    box.appendChild(div);
+  });
+}
+
+function loop(){
+  analyser.getFloatTimeDomainData(inputBuf);
+  const [pitch, clarity] = detector.findPitch(inputBuf, audioCtx.sampleRate);
+  live.freq = (clarity>0.9 && pitch>=loFloorHz) ? pitch : 0;   // 下限未満(雑音)は捨てる
+  live.clarity = clarity;
+  const info = live.freq ? freqToNote(live.freq) : null;
+  el("hz").textContent = live.freq ? live.freq.toFixed(1) : "–";
+  el("noteName").textContent = info ? info.name : "–";
+  el("cents").textContent = info ? (info.cents>=0?"+":"")+info.cents+" c" : "";
+  el("clarBar").style.width = Math.round(clarity*100)+"%";
+
+  // FFTの最強ピーク（pitchyが苦手な高音の補完に使う）
+  analyser.getFloatFrequencyData(freqData);
+  const binHz = audioCtx.sampleRate / analyser.fftSize;
+  const minBin = Math.floor(loFloorHz / binHz);   // 下限未満の暗騒音(エアコン等)を無視
+  let pk=-Infinity, pki=-1;
+  for(let i=minBin;i<freqData.length;i++){ if(freqData[i]>pk){ pk=freqData[i]; pki=i; } }
+  live.peak = (pk > -75 && pki>0) ? pki*binHz : 0;
+
+  // push-to-talk 中: 窓ごとに基音を確定
+  if(cap.active){
+    const spfMs = parseFloat(el("spf").value)*1000;
+    const t = performance.now() - cap.t0;
+    const idx = Math.floor(t / spfMs);
+    while(cap.windowIndex < idx){ finalizeWindow(); cap.windowIndex++; }
+    const frac = t/spfMs - idx;                 // 窓内の位置 0..1
+    if(frac>0.25 && frac<0.85){                 // 立ち上がり/切替を避け中央だけ拾う
+      if(live.freq && live.clarity>0.9) cap.fs.push(live.freq);
+      if(live.peak) cap.ps.push(live.peak);
+    }
+    const on = frac<0.18;                        // 拍の頭を光らせる
+    el("beatDot").classList.toggle("on", on);
+    el("beatDot").textContent = idx+1;
+  }
+  raf = requestAnimationFrame(loop);
+}
+
+// --- 調の識別 ---
+let identified = null;   // {label, tonic, tonicPc, pos4Note}
+
+function identify(){
+  identified = null;
+  el("playBtn").disabled = true;
+  el("stopBtn").disabled = true;
+  const seq = cap.seq;
+  if(seq.length !== 8 || seq.some(s => s.freq == null)){
+    el("capStatus").textContent = seq.length + "本しか取れませんでした。";
+    el("resultBox").innerHTML = '<div class="fail">判別できませんでした。もう一度</div>'+
+      '<div class="muted" style="margin-top:6px">8本すべてを、拍に合わせて途切れず吹いてください。</div>';
+    return;
+  }
+  el("capStatus").textContent = "8本を記録しました。";
+  const measSlots = seq.map(s => nearestSlot(s.freq));
+
+  // 12調は同じ並びの移調なので、位置ごとの一致は正しい調だけ多く、他の調はほぼ0になる。
+  // よって「最も一致した調が明確に一位（次点より2本以上多い）」なら、全8本そろわなくても調が決まる。
+  const counts = CARDS.map(c => {
+    let m = 0;
+    for(let i=0;i<8;i++) if(c.slots[i] === measSlots[i]) m++;
+    return m;
+  });
+  let best = 0;
+  for(let ci=1; ci<counts.length; ci++) if(counts[ci] > counts[best]) best = ci;
+  const bestCount = counts[best];
+  const secondCount = counts.reduce((mx, v, ci) => ci === best ? mx : Math.max(mx, v), 0);
+  const pos4Note = seq[3].note ? seq[3].note.name : "—";
+
+  // 最低3本一致かつ次点より2本以上多い＝明確な一位のときだけ識別成功（全8本一致は不要）。
+  if(bestCount < 3 || bestCount - secondCount < 2){
+    el("resultBox").innerHTML = '<div class="fail">判別できませんでした。もう一度</div>'+
+      `<div class="muted" style="margin-top:6px">最も近い調でも一致 ${bestCount}本（次点 ${secondCount}本）で、はっきり一つに決まりませんでした。各笛が高音までしっかり鳴っているか確かめてください。</div>`;
+    return;
+  }
+
+  const c = CARDS[best];
+  identified = { label:c.label, tonic:c.tonic, tonicPc:PC[c.tonic], pos4Note };
+  showResult(bestCount);
+  el("playBtn").disabled = false;
+}
+
+function showResult(bestCount){
+  const c = identified;
+  const chords = buildProgression(c.tonicPc);   // 表示用
+  const degRow = ["I","V","vi","IV"].map((rn,i)=>
+    `<div class="deg" data-deg="${i}"><div class="rn">${rn}</div><div class="ch">${chords[i].name}</div></div>`
+  ).join("");
+  el("resultBox").innerHTML =
+    `<div class="keysub">識別された調</div>`+
+    `<div class="keybig">${c.label}</div>`+
+    `<div class="keysub">主音 ${c.tonic}　（位置4の測定音名：${c.pos4Note}／一致 ${bestCount}/8）</div>`+
+    `<div class="prog">${degRow}</div>`+
+    `<div class="muted">下のボタンでコード進行 I–V–vi–IV を鳴らします。</div>`;
+}
+
+// --- コード進行の生成と再生（Web Audio） ---
+// I=Tメジャー, V=(T+7)メジャー, vi=(T+9)マイナー, IV=(T+5)メジャー
+function buildProgression(T){
+  const MAJ = [0,4,7], MIN = [0,3,7];
+  const nameOf = pc => NOTE_NAMES[((pc%12)+12)%12];
+  const rootMidi = pc => 60 + (((pc%12)+12)%12);   // C4(=60)帯に根音を置く
+  return [
+    {name: nameOf(T),      root: rootMidi(T),      intervals: MAJ},
+    {name: nameOf(T+7),    root: rootMidi(T+7),    intervals: MAJ},
+    {name: nameOf(T+9)+"m",root: rootMidi(T+9),    intervals: MIN},
+    {name: nameOf(T+5),    root: rootMidi(T+5),    intervals: MAJ},
+  ];
+}
+const midiToFreq = m => 440 * Math.pow(2, (m-69)/12);
+
+let playCtx = null, playTimers = [], playing = false;
+
+function stopChord(){
+  playing = false;
+  playTimers.forEach(id => clearTimeout(id));
+  playTimers = [];
+  if(playCtx){ try{ playCtx.close(); }catch{} playCtx = null; }
+  document.querySelectorAll(".prog .deg.playing").forEach(d => d.classList.remove("playing"));
+  el("stopBtn").disabled = true;
+}
+
+function playChordAt(ctx, chord, startT, dur){
+  const attack = 0.02, release = 0.12;
+  chord.intervals.forEach(iv => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "triangle";
+    osc.frequency.value = midiToFreq(chord.root + iv);
+    const peak = 0.22;
+    gain.gain.setValueAtTime(0.0001, startT);
+    gain.gain.linearRampToValueAtTime(peak, startT + attack);
+    gain.gain.setValueAtTime(peak, startT + dur - release);
+    gain.gain.linearRampToValueAtTime(0.0001, startT + dur);   // クリック音を防ぐ短いエンベロープ
+    osc.connect(gain).connect(ctx.destination);
+    osc.start(startT);
+    osc.stop(startT + dur + 0.02);
+  });
+}
+
+function playProgression(){
+  if(!identified) return;
+  stopChord();
+  const chords = buildProgression(identified.tonicPc);
+  const ctx = new (window.AudioContext||window.webkitAudioContext)();
+  playCtx = ctx; playing = true;
+  el("stopBtn").disabled = false;
+
+  const chordDur = 0.9, gap = 0.12, slot = chordDur + gap;
+  const rounds = 2;
+  const t0 = ctx.currentTime + 0.06;
+  let n = 0;
+  for(let r=0; r<rounds; r++){
+    for(let i=0; i<chords.length; i++, n++){
+      const startT = t0 + n*slot;
+      playChordAt(ctx, chords[i], startT, chordDur);
+      // 表示のハイライト（再生時刻に合わせて点灯）
+      const at = (startT - ctx.currentTime) * 1000;
+      playTimers.push(setTimeout(()=>{
+        if(!playing) return;
+        document.querySelectorAll(".prog .deg.playing").forEach(d=>d.classList.remove("playing"));
+        const deg = document.querySelector(`.prog .deg[data-deg="${i}"]`);
+        if(deg) deg.classList.add("playing");
+      }, Math.max(0, at)));
+    }
+  }
+  const totalMs = (n*slot + 0.3) * 1000;
+  playTimers.push(setTimeout(stopChord, totalMs));
+}
+
+// --- イベント ---
+const ptt = el("pttBtn");
+ptt.addEventListener("pointerdown", e=>{ e.preventDefault(); try{ ptt.setPointerCapture(e.pointerId); }catch{} beginCapture(); });
+ptt.addEventListener("pointerup",   e=>{ e.preventDefault(); endCapture(); });
+ptt.addEventListener("pointercancel", ()=> endCapture());
+el("clearBtn").onclick = ()=>{
+  stopChord();
+  cap.seq=[]; identified=null; renderSeq();
+  el("capStatus").textContent="";
+  el("resultBox").innerHTML='<div class="muted">8本を吹くと、ここに識別した調が表示されます。</div>';
+  el("playBtn").disabled=true; el("stopBtn").disabled=true;
+};
+el("playBtn").onclick = playProgression;
+el("stopBtn").onclick = stopChord;
+el("startBtn").onclick = start;
+renderSeq();
+</script>
+</body>
+</html>

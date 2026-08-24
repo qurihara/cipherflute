@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CipherFlute 復号デモ（紹介動画の子画面用）</title>
+<!--
+  紹介動画の子画面（PinP）に映すためだけの、機能を絞った復号の画面である。
+
+  なぜ本編（index.html）を使わないか
+  ----------------------------------
+  本編は入口が3つあり、設定のつまみや注意書きが並ぶ。子画面へ縮めると何も読めない。
+  また本編の節2は「1枚ぶんの符号」として復号するので、2枚組（かるたの上下）を
+  続けて吹くと符号語が長すぎて必ず失敗する。**映像では「何本そろったか」が見えれば
+  十分**なので、ここでは復号ではなく本数で判定する。
+
+  つかいかた
+  ----------
+    demo.html#demoaudio=<音声>&need=<本数>[&lo=G%236&hi=G7&minnote=200&onmargin=26]
+
+    need   … この本数がそろった瞬間に「認証成功」を出す
+    demoaudio … 実演の録画から抜いた音声。マイクの代わりにこれを流す
+
+  ★真っ黒な子画面を作らないために★
+  最初の音が出るまでは何も描かない（body に .idle が付く）。合成の側はこの間を
+  避けて子画面を出す。v9 では5つの場面で、まだ何も出ていない枠だけが黒く映った。
+-->
+<style>
+  :root{ color-scheme: dark; }
+  html,body{ margin:0; padding:0; background:#0f1420; color:#dfe6f5;
+             font-family:-apple-system,"Hiragino Sans",sans-serif; }
+  #wrap{ padding:14px 16px; }
+  /* ★高さは最初から確保する★ 音が増えるたびに枠が伸びると、コマごとに絵の
+     大きさが変わり、動画にしたとき縦に潰れる。必要な行数ぶんを先に取っておく。 */
+  #seq{ display:flex; flex-wrap:wrap; gap:10px; align-content:flex-start; }
+  .chip{ background:#151d2e; border:1px solid #24304a; border-radius:12px;
+         padding:8px 16px; min-width:76px; text-align:center; }
+  .chip.ref{ border-color:#3f6fd8; }
+  .chip .idx{ font-size:13px; opacity:.7; }
+  .chip .nm{ font-size:42px; font-weight:700; color:#7ab4ff; line-height:1.15; }
+  /* ★出る前から場所を取っておく★ 出た瞬間に枠が伸びると、そのコマだけ絵の
+     大きさが変わってしまう。見えないだけで高さは最初から確保する。 */
+  #ok{ visibility:hidden; width:100%; text-align:center; font-size:52px; font-weight:700;
+       color:#3ddc84; letter-spacing:.14em; padding:14px 0 4px; }
+  body.done #ok{ visibility:visible; }
+  /* 音が1本も来ていないうちは、枠すら描かない（黒い箱を映さないため） */
+  body.idle #wrap{ visibility:hidden; }
+</style>
+</head>
+<body class="idle">
+<div id="wrap">
+  <div id="seq"></div>
+  <div id="ok">認証成功</div>
+</div>
+
+<script src="fft_peak.js"></script>
+<script src="silence_segmenter.js"></script>
+<script>
+(function(){
+  const q = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const qs = new URLSearchParams(location.search);
+  const get = (k, d) => (q.get(k) !== null ? q.get(k) : (qs.get(k) !== null ? qs.get(k) : d));
+
+  const NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+  const noteToMidi = s => {
+    const m = /^([A-G]#?)(-?\d+)$/.exec(s.trim());
+    return m ? NOTES.indexOf(m[1]) + (parseInt(m[2],10)+1)*12 : null;
+  };
+  const midiToFreq = n => 440 * Math.pow(2, (n-69)/12);
+  const freqToName = f => {
+    const n = Math.round(69 + 12*Math.log2(f/440));
+    return NOTES[((n%12)+12)%12] + (Math.floor(n/12)-1);
+  };
+
+  const loNote = get("lo","G#6"), hiNote = get("hi","G7");
+  const loHz = midiToFreq(noteToMidi(loNote)) * Math.pow(2,-1/12);   // 半音ぶんの余裕
+  const hiHz = midiToFreq(noteToMidi(hiNote)) * Math.pow(2, 1/12);
+  const need = parseInt(get("need","0"), 10) || 0;
+  const audioUrl = get("demoaudio", null);
+  // ★音が鳴り始めてからおよそ0.5秒で音名が出るようにする★
+  // 区切りは音の終わりで決まるので、何もしなくても0.7秒ほど遅れて出る（実測）。
+  // 狙いの0.5秒に寄せるには、むしろ待たせない。0にすると実測で0.55秒前後になる。
+  const showDelayMs = parseFloat(get("showdelay", "0"));
+
+  const seg = window.SilenceSegmenter.create({
+    onMarginDb: parseFloat(get("onmargin","26")),
+    minNoteMs:  parseFloat(get("minnote","200")),
+    gapMs:      parseFloat(get("gap","100")),
+    pitchSplitCents: parseFloat(get("splitcents","80")),
+    endMs: 0                       // 終わりは本数で決める。無音では切らない
+  });
+
+  const seqEl = document.getElementById("seq");
+  let count = 0;
+
+  // 1行に並ぶ数から必要な行数を見積もり、その高さを先に確保する。
+  // 3行ぶんは最低でも取る（2行で終わる素材でも、枠の大きさを揃えたいため）。
+  const perRow = Math.max(1, Math.floor((innerWidth - 32) / 150));
+  const rows = Math.max(3, Math.ceil((need || perRow * 3) / perRow));
+  seqEl.style.minHeight = (rows * 104) + "px";
+
+  function add(freq){
+    count++;
+    const d = document.createElement("div");
+    d.className = "chip" + (count === 1 ? " ref" : "");
+    d.innerHTML = '<div class="idx">' + count + (count===1 ? " 基準" : "") + '</div>' +
+                  '<div class="nm">' + freqToName(freq) + '</div>';
+    seqEl.appendChild(d);
+    document.body.classList.remove("idle");
+    // ★指定の本数がそろった瞬間に認証成功★ 復号の成否は見ない。映像では
+    // 「必要な数だけ読めた」ことが伝わればよい。
+    if(need && count >= need) document.body.classList.add("done");
+  }
+
+  let ctx, analyser, buf, el;
+  async function start(){
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    let src;
+    if(audioUrl){
+      el = new Audio(audioUrl); el.crossOrigin = "anonymous";
+      window.__demoAudio = el;
+      src = ctx.createMediaElementSource(el);
+      src.connect(ctx.destination);
+    }else{
+      const st = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,
+                   noiseSuppression:false, autoGainControl:false}});
+      src = ctx.createMediaStreamSource(st);
+    }
+    analyser = new AnalyserNode(ctx, {fftSize:4096, smoothingTimeConstant:0});
+    src.connect(analyser);
+    buf = new Float32Array(analyser.frequencyBinCount);
+    await ctx.resume();
+    loop();
+    if(el){ el.currentTime = 0; setTimeout(()=>el.play().catch(()=>{}), 600); }
+  }
+
+  function loop(){
+    analyser.getFloatFrequencyData(buf);
+    const binHz = ctx.sampleRate / analyser.fftSize;
+    const pk = window.FftPeak.peakInBand(buf, binHz, loHz, hiHz);
+    const t = performance.now();
+    // peakInBand が返すのは {freq, level, bin}。level が強さ[dB]である
+    const ev = seg.feed(t, pk ? pk.level : -140, pk ? pk.freq : null);
+    // ★音が鳴ってから少し置いて出す★ 区切りは音の終わりで決まるので、そのまま
+    // 描くと鳴り終わりと同時に出る。人が「聞いてから読む」間合いに寄せる。
+    if(ev && ev.type === "note" && ev.freq){
+      const f = ev.freq;
+      setTimeout(() => add(f), showDelayMs);
+    }
+    // ★タブが前面でなくても回す★ requestAnimationFrame は隠れたタブで止まり、
+    // 音だけが進んで何も検出されない。画面を持たないChromeで撮るのでこれが要る。
+    setTimeout(loop, 16);
+  }
+
+  window.__demoStart = start;
+  start();
+})();
+</script>
+</body>
+</html>

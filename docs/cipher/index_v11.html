@@ -1,0 +1,1399 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CipherFlute 復号 v11</title>
+<style>
+  :root{
+    --bg:#0f1220; --card:#1a1f36; --fg:#e8ecf5; --muted:#98a2c0;
+    --accent:#5b8cff; --ok:#37c98a; --warn:#ffb454; --ng:#ff6b6b; --line:#2b3255;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+       background:var(--bg);color:var(--fg);line-height:1.6}
+  .wrap{max-width:680px;margin:0 auto;padding:20px 16px 60px}
+  h1{font-size:1.35rem;margin:.2em 0}
+  h2{font-size:1.05rem;margin:1.4em 0 .5em;color:var(--accent)}
+  p.lead{color:var(--muted);margin:.2em 0 1em}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0}
+  button{font:inherit;border:none;border-radius:9px;padding:.7em 1.1em;cursor:pointer;color:#fff;background:var(--accent)}
+  button.sec{background:#2b335c}
+  button.ok{background:var(--ok)}
+  button:disabled{opacity:.45;cursor:default}
+  .meter{display:flex;align-items:baseline;gap:.5em;justify-content:center;margin:.3em 0}
+  .hz{font-size:2.2rem;font-weight:700;font-variant-numeric:tabular-nums}
+  .note{font-size:2.2rem;font-weight:700;color:var(--accent)}
+  .cents{font-size:1rem;color:var(--muted)}
+  .muted{color:var(--muted);font-size:.9rem}
+  .status{font-size:.9rem;color:var(--warn);min-height:1.4em}
+  .clar{height:6px;background:#0c0f1d;border-radius:4px;overflow:hidden;margin-top:6px}
+  .clar > i{display:block;height:100%;width:0;background:var(--ok)}
+  input.wide{width:100%;background:#0c0f1d;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:.55em;font-family:ui-monospace,Menlo,monospace}
+  select{font:inherit;background:#0c0f1d;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:.4em}
+  a{color:var(--accent)}
+  .notice{background:#2a2033;border:1px solid var(--warn);border-left-width:5px;border-radius:10px;
+          padding:14px 16px;margin:14px 0;font-size:.92rem;line-height:1.75}
+  .notice b{color:var(--warn)}
+  .notice ul{margin:.5em 0 0;padding-left:1.3em}
+  .notice li{margin:.25em 0}
+
+  /* push-to-talk */
+  .ptt{width:100%;padding:1.4em 1em;font-size:1.2rem;font-weight:700;background:var(--accent);
+       border-radius:14px;touch-action:none;user-select:none;-webkit-user-select:none}
+  .ptt.rec{background:var(--ng)}
+  .beatwrap{display:flex;align-items:center;gap:16px;justify-content:center;margin:14px 0 6px;min-height:64px}
+  .beatdot{width:54px;height:54px;border-radius:50%;background:#2b335c;transition:transform .05s,background .05s;
+           display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700}
+  .beatdot.on{background:var(--ok);transform:scale(1.18)}
+  .beatdot.prep{background:var(--warn)}
+  .seq{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .chip{background:#0c0f1d;border:1px solid var(--line);border-radius:9px;padding:.4em .7em;font-variant-numeric:tabular-nums;text-align:center;min-width:74px}
+  .chip .idx{font-size:.7rem;color:var(--muted)}
+  .chip .nm{font-size:1.1rem;font-weight:700;color:var(--accent)}
+  .chip .fz{font-size:.75rem;color:var(--muted)}
+  .chip.ref{border-color:var(--accent)}
+  .chip.empty .nm{color:var(--ng)}
+  .big{font-size:1.1rem}
+  .okmark{color:var(--ok);font-weight:700}
+  .ngmark{color:var(--ng);font-weight:700}
+
+  /* 1文字ずつモードの候補表示 */
+  .cand{font-size:2.6rem;font-weight:800;color:var(--ok);text-align:center;min-height:1.2em;margin:.2em 0}
+
+  /* 成功エフェクト（オーバーレイ） */
+  #successOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;
+    background:rgba(9,12,24,.86);z-index:50;text-align:center;padding:24px}
+  #successOverlay.show{display:flex;animation:fadeIn .25s ease}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  .checkring{width:120px;height:120px;border-radius:50%;background:var(--ok);display:flex;align-items:center;justify-content:center;
+    font-size:64px;color:#fff;animation:pop .5s cubic-bezier(.2,1.4,.4,1)}
+  @keyframes pop{0%{transform:scale(0)}100%{transform:scale(1)}}
+  .checkring::after{content:"✓"}
+  #successOverlay h3{font-size:1.5rem;margin:.6em 0 .2em}
+  #successOverlay .sub{color:var(--muted)}
+  .ver{font-size:.55em;vertical-align:middle;background:#2b6cb0;color:#fff;
+       padding:2px 8px;border-radius:10px;letter-spacing:.02em}
+  .verNote{font-size:.82em;color:#555;margin:-6px 0 14px}
+  .expectBox{margin:0 0 12px;padding:8px 10px;background:#f7f7f9;border-radius:8px;font-size:.9em}
+  .expectBox summary{cursor:pointer;color:#2b6cb0}
+  .expectBox input{width:100%;padding:6px;font-family:ui-monospace,monospace;margin-top:6px}
+  .chip.hit{background:#e6f6ea;border-color:#57a773}
+  .chip.miss{background:#fdecea;border-color:#d1493f}
+  .exp{font-size:.72em;color:#666;display:block}
+  .fileBox{margin:10px 0;padding:8px 10px;background:#0f1424;border:1px solid var(--line);border-radius:8px}
+  .fileBox input{font:inherit;color:var(--fg);margin-top:4px}
+  .chip.off{opacity:.42;text-decoration:line-through}
+  .chip{cursor:pointer}
+  .why{font-size:.7em;color:#8a6d3b;display:block}
+  .why.warn{color:#b34;font-weight:600}
+  #autoTempo{font-size:.85em;color:#2b6cb0;margin-top:6px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CipherFlute 復号 <span class="ver" id="pageVer">v11</span></h1>
+  <details class="expectBox"><summary>照合用：期待する音列を貼る（デバッグ）</summary>
+    <p class="hint">設計どおりの音列を空白区切りで貼ると、吹いた結果と1本ずつ突き合わせて色分けします。
+      例 <code>C7 G7 D#7 F7 G#6 A#6 C#7 D#7</code>。基準笛を含めて先頭から並べてください。</p>
+    <input id="expectSeq" type="text" placeholder="C7 G7 D#7 F7 G#6 A#6 C#7 D#7" autocomplete="off">
+    <div id="expectStat" class="hint"></div>
+  </details>
+  <p class="verNote"><b>v11</b>（2026-08-06）… 音域から外れた音を列から消さず、読めなかった印を付けて残すようにしました（消すと位置が詰まって以降がずれます）。倍音の引き戻しはやめ、飛ばしとしてパリティに直させます。<br>
+  <b>v10</b>（2026-08-06）… 録音ファイルを読み込めるようにしました（マイクの代わり。節2の下）。あわせて、音域のすぐ外にある音を倍音と取り違えないようにしました。<br>
+  <b>v9</b>（2026-08-06）… 担体を持ち替える空白を「鳴らなかった笛」と誤解しないようにしました。スプール2枚のように途中で持ち替える読み方でも、本数が狂いません。<br>
+  <b>v8</b>（2026-08-06）… 鳴らなかった笛を「除外」ではなく「飛ばし」にしました。位置を保つので、誤り訂正のパリティで直せます。拍に音が来なかったところにも飛ばしを入れます。<br>
+  <b>v7</b>（2026-08-06）… 秘密分散の節で、担体の番号を1〜9から選べるようにしました（画像タイル9枚の 2-of-9 に対応）。<br>
+  <b>v6</b>（2026-08-06）… 「続けて吹く」で、吹いたテンポを手がかりに雑音を見分けるようにしました。
+    捨てられた音も列に残し、拍に乗っていれば拾い直します。各音はクリックで除外・復帰できます。
+    <details style="display:inline"><summary style="display:inline;cursor:pointer;color:#2b6cb0">これまでの版</summary>
+    <span style="display:block;margin-top:4px">
+      v5 … 期待する音列を貼ると、吹いた結果と1本ずつ突き合わせて色分けします。<br>
+      v4 … v3で音域外の音が鳴るとページが固まる不具合を直しました。<br>
+      v3 … 符号の音域から外れた音を、列にも入れないようにしました。<br>
+      v2 … 音名を基準笛で補正して表示するようにし、倍音の取り違えをオクターブ単位で引き戻すようにしました。
+    </span></details>
+  </p>
+  <p class="lead">3Dプリントした笛の並び（コーム）を、先頭の基準笛から順に1本ずつ吹くと、検出した音から秘密を復号します。マイクだけで動きます。</p>
+
+  <div class="notice">
+    <b>このページはCipherFluteのデモンストレーション用です。本物の秘密情報には使わないでください。</b>
+    仕組みを実際に試して見ていただくことを目的に作ってあり、秘密情報の扱いには次のような弱点が残っています。
+    <ul>
+      <li>照合用の値や遷移先といった設定を、URLに載せて渡しています。そのため<b>URLを手に入れた人は、笛を持っていなくても、手元で秘密の候補を片端から試せます</b>。暗証番号のような小さい秘密であれば、これだけで破られます。</li>
+      <li>復号した秘密は画面に表示されます。周りから見えますし、画面の記録にも残ります。</li>
+      <li>吹いた音は聞こえるので、その場にいる人や録音した人には秘密が伝わります。</li>
+    </ul>
+    実際に秘密を守る用途では、これらの情報をURLに載せず別の適切な手段で受け渡し、復号も管理された場で行う必要があります。
+    なお、笛という物体そのものに秘密を守る力はありません。保管場所を知られた場合は、吹かなくても計測や透過撮影で読み取れます。
+  </div>
+
+  <div class="card">
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button id="startBtn" style="display:none">マイク開始</button>
+      <span class="status" id="status">マイクの許可を求めています…（表示が出たら「許可」してください）</span>
+    </div>
+    <div class="meter"><span class="hz"><span id="hz">–</span><span style="font-size:.9rem;color:var(--muted)"> Hz</span></span>
+      <span class="note" id="noteName">–</span><span class="cents" id="cents"></span></div>
+    <div class="clar"><i id="clarBar"></i></div>
+    <div class="muted" style="margin-top:6px">今鳴っている音の目安です。各笛がここにきちんと出るのを確かめてから測ると確実です。</div>
+  </div>
+
+  <h2>1. 順番に吹いて測る（押しながら吹く）</h2>
+  <div class="card">
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+      <label class="muted" for="spf">1本あたりの時間：</label>
+      <select id="spf">
+        <option value="0.7">0.7秒</option>
+        <option value="1.0" selected>1.0秒</option>
+        <option value="1.5">1.5秒</option>
+        <option value="2.0">2.0秒</option>
+      </select>
+      <span class="muted">押すと1秒の準備のあと拍が始まります。</span>
+    </div>
+    <div class="beatwrap">
+      <div class="beatdot" id="beatDot">–</div>
+      <div class="muted" id="beatHint" style="max-width:300px">押した瞬間から1秒の準備。その後、緑に光るたびに次の笛へ。最後の笛を吹いたら離してください。</div>
+    </div>
+    <button class="ptt" id="pttBtn">押しながら順に吹く</button>
+    <div class="seq" id="seq"></div>
+    <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button class="sec" id="clearBtn">やり直す</button>
+      <span class="status" id="capStatus"></span>
+    </div>
+  </div>
+
+  <h2>2. 続けて吹く（無音で自動送り）</h2>
+  <div class="card">
+    <div class="muted">「開始」を押したら、笛を順に吹いていきます。1本吹くたびに一瞬（0.1秒ほど）息を切って無音をつくると、そこが区切りとして検出され、次の桁へ自動で進みます。拍に合わせる必要はありません。下の設定を入れると、息を切らずに続けて吹き、<b>音が変わったところ</b>で区切ることもできます。<br>
+      吹き終えたら<b>もう一度ボタンを押して「終了し復号」</b>します。終わりを決めるのは利用者であり、システムは秘密が何本あるかを知りません。途中で間が空いても勝手に確定しないので、急かされずに吹けます。余計な音が1本入ってしまったときは「1本取り消す」で戻せます。</div>
+    <div class="beatwrap">
+      <div class="beatdot" id="autoDot">–</div>
+      <div style="flex:1;max-width:320px">
+        <div class="clar"><i id="autoLevel" style="width:0%"></i></div>
+        <div class="muted" id="autoHint" style="margin-top:6px">開始すると、まず部屋の静けさを0.4秒ほど測り、そこを基準に区切りを判定します。</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:10px">
+      <label class="muted" for="gapRange">区切りとみなす無音の長さ：</label>
+      <input type="range" id="gapRange" min="60" max="400" step="10" value="100" style="flex:1;min-width:160px">
+      <span class="muted" id="gapVal" style="font-variant-numeric:tabular-nums">100 ms</span>
+    </div>
+    <div class="muted" style="margin:-4px 0 10px">短くすると速く吹けます。1本のつもりが2本に切れるときは長くしてください。吹いている途中でも変えられます。</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+      <label style="display:flex;gap:8px;align-items:center;cursor:pointer">
+        <input type="checkbox" id="pitchSplit" style="width:18px;height:18px">
+        <span>音が変わったところでも区切る（息を切らずに続けて吹く）</span>
+      </label>
+    </div>
+    <div class="muted" style="margin:0 0 10px">息継ぎをせず、唇を当てたまま次の笛へ滑らせて読めます。<b>隣り合う笛が同じ音だと1本に融合してしまう</b>ので、同じ音が隣り合わない並びのときだけ使ってください（印刷済みのスプールとカードはどちらも条件を満たしています）。</div>
+    <details style="margin:0 0 10px">
+      <summary class="muted" style="cursor:pointer">区切りの細かい調整</summary>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0 2px">
+        <label class="muted" for="splitRange">音の変わり目とみなす隔たり：</label>
+        <input type="range" id="splitRange" min="10" max="200" step="5" value="80" style="flex:1;min-width:160px">
+        <span class="muted" id="splitVal" style="font-variant-numeric:tabular-nums">50 セント</span>
+      </div>
+      <div class="muted" style="margin:0 0 8px">小さくすると音の変わり目を拾いやすくなります。半音は100セントです。上の「音が変わったところでも区切る」に入れているときだけ効きます。</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 2px">
+        <label class="muted" for="stableRange">変わったと認めるまでの時間：</label>
+        <input type="range" id="stableRange" min="20" max="200" step="10" value="70" style="flex:1;min-width:160px">
+        <span class="muted" id="stableVal" style="font-variant-numeric:tabular-nums">70 ms</span>
+      </div>
+      <div class="muted" style="margin:0 0 8px">離れた音がこの時間続いたら、そこで区切ります。短くすると速く反応しますが、吹き始めの音の揺れで誤って区切りやすくなります。</div>
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:0 0 2px">
+        <label class="muted" for="minnoteRange">これより短い音は捨てる：</label>
+        <input type="range" id="minnoteRange" min="40" max="300" step="10" value="120" style="flex:1;min-width:160px">
+        <span class="muted" id="minnoteVal" style="font-variant-numeric:tabular-nums">120 ms</span>
+      </div>
+      <div class="muted" style="margin:0 0 4px">咳や物音を1本と数えないための足切りです。速く吹いて取りこぼすときは短くしてください。</div>
+    </details>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button id="autoStartBtn">開始</button>
+      <button class="sec" id="autoSkipBtn" disabled>この笛は飛ばす</button>
+      <button class="sec" id="autoUndoBtn" disabled>1本取り消す</button>
+      <button class="sec" id="autoClearBtn">やり直す</button>
+    </div>
+    <div class="muted" style="margin-top:8px">鳴らない笛があったら「この笛は飛ばす」を押してください。その位置を空けたまま次へ進めるので、並びがずれません。空けた分は誤り訂正で埋められます（検査用の笛が足りていれば復元できます）。</div>
+    <div class="seq" id="autoSeq"></div>
+    <div class="fileBox">
+      <label class="muted" for="autoFile">録音ファイルから読む（マイクの代わり）：</label>
+      <input id="autoFile" type="file" accept="audio/*">
+      <span class="status" id="autoFileStatus"></span>
+      <div class="hint">その場で吹く代わりに、録音した音声（m4a・wav・mp3など）を読み込んで同じように解析します。
+        うまく読めなかったときに、何度でも条件を変えて試せます。マイクの許可は要りません。</div>
+    </div>
+      <div id="autoTempo"></div>
+    <span class="status" id="autoStatus"></span>
+  </div>
+
+  <h2>2'. 1文字ずつ入力（1本ずつ確定）</h2>
+  <div class="card">
+    <div class="muted">「開始」を押すと1本ぶんの音を受け付けます。いま鳴っている音が下に出ます（新しい音に上書き）。「入力」でその音を1本ぶん確定。全部入れ終えたら「終了して復号」。</div>
+    <div class="cand" id="oneCand">–</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:6px">
+      <button id="oneStartBtn">開始</button>
+      <button class="ok" id="oneCommitBtn" disabled>入力（この音を確定）</button>
+      <button class="sec" id="oneEndBtn" disabled>終了して復号</button>
+      <button class="sec" id="oneClearBtn">やり直す</button>
+    </div>
+    <div class="seq" id="oneSeq"></div>
+    <span class="status" id="oneStatus"></span>
+  </div>
+
+  <h2>3. 復号して照合</h2>
+  <div class="card">
+    <label class="muted" for="cipherHash">照合用SHA-256（任意、hex）</label>
+    <input class="wide" id="cipherHash" inputmode="text" autocomplete="off" placeholder="64桁のSHA-256 hex（?sha256=… で自動入力）">
+    <div style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <button id="decodeBtn">この並びで復号</button>
+      <span class="status" id="decodeStatus"></span>
+    </div>
+    <div class="muted big" style="margin-top:8px">秘密 payload (hex): <b id="decodedPayload" style="color:var(--ok);word-break:break-all">–</b></div>
+    <div class="muted big" style="margin-top:4px">照合: <b id="verdict">–</b></div>
+    <div id="gotoWrap" style="display:none;margin-top:14px">
+      <a id="gotoBtn" href="#" rel="noopener" style="display:inline-block;background:var(--ok);color:#fff;text-decoration:none;font-weight:700;border-radius:9px;padding:.8em 1.2em">認証成功 — 秘密のページを開く →</a>
+      <div class="muted" id="gotoNote" style="margin-top:6px"></div>
+    </div>
+  </div>
+
+  <h2>4. 2枚を合わせて認証する（2-of-2）</h2>
+  <div class="card">
+    <div class="muted">秘密を2つに分けて2枚のカードに入れてある場合の読み方です。片方には乱数が、もう片方には「秘密−乱数」が入っているので、<b>2枚そろって初めて秘密が出ます</b>。1枚だけでは何も分かりません。<br>
+      <b>1枚ずつ別々に読みます。</b>それぞれのカードが自分の基準笛を先頭に持っているためで、2枚を続けて吹くと2枚目の基準笛がデータとして読まれてしまいます。読み方は「2. 続けて吹く」と同じで、息を切るか音の変わり目で自動的に次の笛へ進みます。<br>
+      吹き始めは<b>ストラップ穴と同じ側の端の笛</b>です。そこから反対の端へ向かって8本を続けて吹き、もう一度ボタンを押して確定してください。<br>
+      いま印刷してあるカードは検査用の笛が1本だけなので、<b>途中の笛が鳴らなかったときは訂正が効きません</b>。読めなかったらそのカードを吹き直してください（何度でもやり直せます）。</div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
+      <button id="shareBtn">1枚目を吹く（開始）</button>
+      <button class="sec" id="shareClearBtn">やり直す</button>
+    </div>
+    <div class="seq" id="shareSeq"></div>
+    <span class="status" id="shareStatus"></span>
+    <div class="muted big" style="margin-top:8px">合わせた秘密: <b id="shareSecret" style="color:var(--ok);word-break:break-all">–</b></div>
+    <div class="muted big" style="margin-top:4px">照合: <b id="shareVerdict">–</b></div>
+  </div>
+
+  <h2>5. いくつかそろえば開く（k-of-n の秘密分散）</h2>
+  <div class="card">
+    <div class="muted">秘密を複数に分けてある場合の読み方です。<b>決められた数だけそろえば開き、それに満たなければ何も分かりません</b>。いくつか失っても残りで復元できます。<br>
+      担体（カード・箱・本立て・画像タイルなど）には<b>番号が彫ってあるか、作ったときに決めてあります</b>。番号は復元の計算に必要なので、吹く前に選んでください。読み方は「2. 続けて吹く」と同じです。<br>
+      例。北斎の画像タイル9枚は 2-of-9 なので、<b>どの2枚でも開きます</b>。左上から右へ1・2・3、次の行が4・5・6、最下段が7・8・9です。</div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:12px 0">
+      <label class="muted" for="thIndex">いま吹く担体の番号：</label>
+      <select id="thIndex" style="font:inherit;background:#0c0f1d;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:.4em">
+        <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+        <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+        <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+      </select>
+      <button id="thBtn">この担体を吹く（開始）</button>
+      <button class="sec" id="thClearBtn">やり直す</button>
+    </div>
+    <div class="seq" id="thSeq"></div>
+    <span class="status" id="thStatus"></span>
+    <div class="muted big" style="margin-top:8px">合わせた秘密: <b id="thSecret" style="color:var(--ok);word-break:break-all">–</b></div>
+    <div class="muted big" style="margin-top:4px">照合: <b id="thVerdict">–</b></div>
+  </div>
+
+  <p class="muted">復号ロジックは <a href="cipher_codec.js">cipher_codec.js</a>（Python版 fue/cipher_codec.py と一致）。設定は <a href="cipher_config.json">cipher_config.json</a>。音程検出は <a href="https://github.com/ianprime0509/pitchy" target="_blank">pitchy</a>。測定・較正ツールは <a href="../">こちら</a>。</p>
+</div>
+
+
+<!-- 成功の表示は画面全体を覆うので、遷移先へ進む手段をこの中にも置く。
+     自動遷移が働かない場合でも行き止まりにならないようにするためである。 -->
+<div id="successOverlay">
+  <div class="checkring"></div>
+  <h3>認証成功</h3>
+  <div class="sub" id="successSub">秘密のページへ移動します…</div>
+  <a id="successGo" href="#" rel="noopener" style="display:none;margin-top:18px;background:var(--ok);color:#fff;
+     text-decoration:none;font-weight:700;border-radius:9px;padding:.8em 1.4em">秘密のページを開く →</a>
+  <button class="sec" id="successClose" style="margin-top:12px">閉じる</button>
+</div>
+
+<script src="cipher_codec.js"></script>
+<script src="silence_segmenter.js"></script>
+<script src="tempo_filter.js"></script>
+<script type="module">
+import { PitchDetector } from "https://esm.sh/pitchy@4";
+
+const NOTE_NAMES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+const el = id => document.getElementById(id);
+let audioCtx, analyser, detector, inputBuf, raf, running=false;
+let freqData;
+let live = {freq:0, clarity:0, peak:0};
+let cipherConfig = null;
+let cipherFreqs = [];               // 復号に渡す並び（吹いた順・先頭が基準）
+let loFloorHz = 1200;               // これ未満は暗騒音(エアコン等)として無視。設定読込後に音域から決める
+
+// --- URLパラメータ（? のクエリと # のフラグメントの両方を読む） ---
+// フラグメント(#以降)はサーバへ送られないので、アクセスログにも参照元情報にも
+// 残らない。設定はこちらに置くのが望ましく、同じ名前ならフラグメントを優先する。
+const cfgOverride = {};
+let gotoUrl = "";     // 平文の遷移先（goto=）。URLに見えるので守秘性はない
+let gotoEnc = "";     // 秘密で暗号化された遷移先（goto_enc=）。秘密を復元しないと開けない
+let packEnc = "";     // 設定一式を秘密で包んだもの（c=）。復号できること自体が認証になる
+let autoNav = true;   // 認証成功で自動遷移（autonav=0 で無効化しボタン方式に）
+const segOptions = {};  // 無音区切りの調整（gap= onmargin= minnote=）
+(function initParams(){
+  const search = new URLSearchParams(location.search);
+  const frag = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const q = {get: name => frag.has(name) ? frag.get(name) : search.get(name)};
+  const num = (name, key) => {
+    const v = q.get(name);
+    if(v !== null && /^\d+(\.\d+)?$/.test(v)) segOptions[key] = parseFloat(v);
+  };
+  num("gap", "gapMs");            // 区切りとみなす無音の長さ[ms]。つまみの初期値になる
+  if(segOptions.gapMs){
+    el("gapRange").value = String(Math.max(60, Math.min(400, segOptions.gapMs)));
+  }
+  el("gapVal").textContent = el("gapRange").value + " ms";
+  num("onmargin", "onMarginDb");  // 暗騒音から何dB上を「鳴っている」とするか
+  num("minnote", "minNoteMs");    // これより短い音は雑音として捨てる[ms]
+  num("splitcents", "pitchSplitCents");  // 音の変わり目とみなす隔たり[セント]
+  num("stablems", "pitchStableMs");      // 離れた音がこの時間続いたら区切る[ms]
+  // つまみの初期値。URLで指定があればそれを、なければ既定値を表示する。
+  const setRange = (id, valId, unit, v, lo, hi) => {
+    if(v !== undefined && v !== null) el(id).value = String(Math.max(lo, Math.min(hi, v)));
+    el(valId).textContent = el(id).value + " " + unit;
+  };
+  setRange("splitRange",   "splitVal",   "セント", segOptions.pitchSplitCents, 10, 200);
+  setRange("stableRange",  "stableVal",  "ms",     segOptions.pitchStableMs,   20, 200);
+  setRange("minnoteRange", "minnoteVal", "ms",     segOptions.minNoteMs,       40, 300);
+  if(q.get("pitchsplit") === "1") el("pitchSplit").checked = true;
+  const sha = (q.get("sha256") || q.get("hash") || "").trim();
+  if(sha) el("cipherHash").value = sha;
+  const spf = q.get("spf");
+  if(spf && [...el("spf").options].some(o=>o.value===spf)) el("spf").value = spf;
+  const mode = q.get("mode");
+  if(mode === "symbols" || mode === "sequential") cfgOverride.mode = mode;
+  const parity = q.get("parity");
+  if(parity !== null && /^\d+$/.test(parity)) cfgOverride.ecc_parity = parseInt(parity, 10);
+  const noteRe = /^[A-Ga-g][#b]?-?\d+$/;
+  const ref = q.get("ref");
+  if(ref && noteRe.test(ref)) cfgOverride.reference_note = ref;
+  const lo = q.get("lo");
+  if(lo && noteRe.test(lo)) cfgOverride.lo_note = lo;
+  const hi = q.get("hi");
+  if(hi && noteRe.test(hi)) cfgOverride.hi_note = hi;
+  const step = q.get("step");
+  if(step !== null && /^\d+(\.\d+)?$/.test(step)) cfgOverride.step_cents = parseFloat(step);
+  const useref = q.get("useref");
+  if(useref === "0" || useref === "false") cfgOverride.use_reference = false;
+  const norepeat = q.get("norepeat");   // 隣り合う笛が同じ音にならない符号化で読む
+  if(norepeat === "1" || norepeat === "true") cfgOverride.no_repeat = true;
+  const g = q.get("goto");
+  if(g && /^https?:\/\//i.test(g)) gotoUrl = g;
+  const ge = q.get("goto_enc");
+  if(ge) gotoEnc = ge.trim();
+  const pk = q.get("c");
+  if(pk) packEnc = pk.trim();
+  if(q.get("autonav") === "0") autoNav = false;
+})();
+
+fetch("cipher_config.json").then(r=>{
+  if(!r.ok) throw new Error("設定を読み込めません ("+r.status+")");
+  return r.json();
+}).then(cfg=>{
+  cipherConfig = Object.assign(cfg, cfgOverride);
+  try{ loFloorHz = window.CipherCodec.noteToFreq(cipherConfig.lo_note) * Math.pow(2, -2/12); }catch{}
+}).catch(e=>{ el("decodeStatus").textContent=e.message; });
+
+function freqToNote(f){
+  if(!f) return null;
+  const folded = foldIntoRange(f);
+  if(!folded) return null;                    // 符号の音域へ引き戻せない＝雑音として捨てる
+  const raw = f; f = folded;
+  const midiFloat = 69 + 12*Math.log2(f/440);
+  const midi = Math.round(midiFloat);
+  const cents = Math.round((midiFloat - midi)*100);
+  const name = NOTE_NAMES[(midi%12+12)%12] + (Math.floor(midi/12)-1);
+  const rel = relativeRead(f);
+  // name は絶対音高で読んだ名前。判定は基準笛との比で行うので、両者は食い違うことがある。
+  // 画面には rel（基準笛で補正した読み）を主に出し、abs は参考として添える。
+  return {midi, cents, name, abs:name, rel, raw, folded: raw !== f,
+          disp: rel ? rel.note : name,
+          dispCents: rel ? rel.cents : cents};
+}
+
+/* 基準笛との比で読む。復号の判定とまったく同じ計算をして、画面表示に使う。
+ *
+ * なぜ要るか。判定は「基準笛との周波数比」で行うのに、表示だけ絶対音高だと食い違う。
+ * 実例（2026-07-31、箱の実測）。2本目の3041Hzは絶対音高ではF#7寄りだが、
+ * 基準笛（C7が2077Hz＝公称より13セント低い）との比で読むとG7から−40セントで、
+ * 判定境界±50セントの内側に入る。内部はG7として正しく復号しているのに、
+ * 画面はF#7と表示していた。目視での確認ができないので、表示も相対に揃える。 */
+function refFreqHz(){
+  // 実測した基準笛。無ければ公称値を使う。
+  if(refMeasuredHz) return refMeasuredHz;
+  try{ return window.CipherCodec.noteToFreq(cipherConfig.reference_note); }catch{ return null; }
+}
+function relativeRead(f){
+  if(!f || !cipherConfig || !window.CipherCodec) return null;
+  let table;
+  try{ table = window.CipherCodec.slots(cipherConfig); }catch{ return null; }
+  if(!table || !table.length) return null;
+  const ref = refFreqHz();
+  if(!ref) return null;
+  let nominal;
+  try{ nominal = window.CipherCodec.noteToFreq(cipherConfig.reference_note); }catch{ return null; }
+  let best=null;
+  for(const s of table){
+    const ratio = s.freq_hz / nominal;
+    const c = 1200*Math.log2((f/ref)/ratio);
+    if(!best || Math.abs(c) < Math.abs(best.cents)) best = {note: s.nearest_note, cents: Math.round(c), slot: s.index};
+  }
+  return best;
+}
+let refMeasuredHz = null;   // 実際に吹いた基準笛の周波数（1本目）
+
+/* 符号に使う音域へ引き戻す（倍音の取り違えを救う）。
+ *
+ * 笛が不調だと、基本波ではなく2倍・3倍の倍音を拾って「とんでもない高音」と読むことがある。
+ * 符号のスロットは公開情報（URLに hi=G7 と書いてある）なので、音域の外に出た値を
+ * オクターブ単位で引き戻しても、隠しているものは減らない。デモの通りやすさが上がる。
+ *
+ * 引き戻せないほど離れている値は null を返し、雑音として捨てる。 */
+function foldIntoRange(f){
+  if(!f || !cipherConfig || !window.CipherCodec) return f;
+  let lo, hi;
+  try{
+    lo = window.CipherCodec.noteToFreq(cipherConfig.lo_note);
+    hi = window.CipherCodec.noteToFreq(cipherConfig.hi_note);
+  }catch{ return f; }
+  const margin = Math.pow(2, 1/12);          // 上下に半音の余裕を見る
+  if(f >= lo/margin && f <= hi*margin) return f;
+  // [* 音域の外は「読めなかった」として捨てる]。拍に乗っていれば飛ばし（消失）に
+  // なるので、パリティが直してくれる。
+  //
+  // v2ではオクターブ単位で引き戻して倍音を救っていたが、録音で害が出た。
+  // G#6（1661Hz）が鳴るべきところで笛が不調に3992Hzを出し、これを半分にして
+  // 1996Hz＝B6として拾ってしまい、以降の並びがすべてずれた（2026-08-06）。
+  // 本物の倍音（C7の2倍＝4154Hz）と不調の音（3992Hz）は値が近く、区別できない。
+  // 捨てて飛ばしにすれば、パリティ2なら2本まで訂正できる。そちらが確実である。
+  return null;
+}
+
+
+async function start(){
+  if(running) return true;
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}});
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    const src = audioCtx.createMediaStreamSource(stream);
+    analyser = new AnalyserNode(audioCtx,{fftSize:8192});
+    src.connect(analyser);
+    detector = PitchDetector.forFloat32Array(analyser.fftSize);
+    inputBuf = new Float32Array(detector.inputLength);
+    freqData = new Float32Array(analyser.frequencyBinCount);
+    running = true;
+    el("startBtn").style.display = "none";
+    el("status").textContent = "準備完了。先頭の基準笛から順に吹いてください。";
+    loop();
+    return true;
+  }catch(e){
+    // 自動起動がブラウザに拒否された場合は、操作ボタンで再度促す
+    el("startBtn").style.display = "";
+    el("status").textContent = "マイクを使うには許可が必要です。下のボタン操作でマイクを開始します（初回は許可を押してください）。";
+    return false;
+  }
+}
+// ボタン操作の直前に必ずマイクを確保する（ユーザー操作の文脈で許可を取る）
+async function ensureMic(){ return running ? true : await start(); }
+
+// --- push-to-talk 逐次キャプチャ（1秒の準備プリロールつき） ---
+const PREROLL_MS = 1000;
+const cap = {active:false, preroll:false, t0:0, windowIndex:0, fs:[], ps:[], seq:[]};
+
+function windowFund(){
+  const median = arr => arr.length ? arr.slice().sort((a,b)=>a-b)[Math.floor(arr.length/2)] : null;
+  if(cap.fs.length>=4) return median(cap.fs);
+  if(cap.ps.length>=4) return median(cap.ps);
+  return null;
+}
+function finalizeWindow(){
+  const f = windowFund();
+  const nt = f ? freqToNote(f) : null;
+  // [* 符号の音域へ引き戻せない音は、列にも入れない]。音名だけ捨てて周波数を残すと、
+  // 雑音がそのまま復号へ渡ってしまう（2026-08-06、栗原さんの指摘で気づいた）。
+  if(f && !nt){
+    el("capStatus").textContent = "いまの音は符号の音域から外れていたので、数えませんでした（" + Math.round(f) + "Hz）。";
+    cap.fs = []; cap.ps = [];
+    return;
+  }
+  if(f && cap.seq.length === 0) refMeasuredHz = f;   // 1本目＝基準笛。以後の表示の物差し
+  cap.seq.push({freq: f, note: nt});
+  cap.fs = []; cap.ps = [];
+  renderSeq();
+  if(navigator.vibrate) navigator.vibrate(25);
+}
+async function beginCapture(){
+  if(!await ensureMic()){ el("capStatus").textContent="マイクを開始できませんでした。"; return; }
+  cap.active=true; cap.preroll=true; cap.t0=performance.now(); cap.windowIndex=0; cap.fs=[]; cap.ps=[]; cap.seq=[];
+  cipherFreqs=[];
+  el("pttBtn").classList.add("rec"); el("pttBtn").textContent="…準備中（離すと復号）";
+  el("capStatus").textContent=""; el("verdict").textContent="–"; el("decodedPayload").textContent="–";
+  el("beatDot").classList.add("prep"); el("beatDot").textContent="用意";
+  renderSeq();
+}
+function endCapture(){
+  if(!cap.active) return;
+  cap.active=false;
+  if(!cap.preroll && (cap.fs.length>=3 || cap.ps.length>=3)) finalizeWindow();
+  cap.preroll=false;
+  el("pttBtn").classList.remove("rec"); el("pttBtn").textContent="押しながら順に吹く";
+  el("beatDot").classList.remove("on","prep"); el("beatDot").textContent="–";
+  while(cap.seq.length && cap.seq[cap.seq.length-1].freq==null) cap.seq.pop();
+  renderSeq();
+  if(!cap.seq.length){ el("capStatus").textContent="音が取れませんでした。もう一度。"; return; }
+  if(cap.seq.some(s=>s.freq==null)){
+    el("capStatus").textContent="途中に無音の拍があります。拍に合わせてやり直してください。";
+    return;
+  }
+  cipherFreqs = cap.seq.map(s=>s.freq);
+  logMeasurements(cap.seq, "拍に合わせる");
+  el("capStatus").textContent = cap.seq.length + "本を記録しました。復号します。";
+  doDecode();
+}
+/* 期待する音列を配列で返す（空なら null）。 */
+function expectedNotes(){
+  const raw = (el("expectSeq") && el("expectSeq").value || "").trim();
+  if(!raw) return null;
+  return raw.split(/[\s,]+/).filter(Boolean);
+}
+
+/* 1本ぶんの照合結果を、chip の追加クラスと注記にして返す。
+ * 期待値が無いときは何も足さない（普段の画面を汚さない）。 */
+function compareOne(i, note){
+  const exp = expectedNotes();
+  if(!exp || i >= exp.length) return {cls:"", html:""};
+  const want = exp[i];
+  const got = note ? note.disp : null;
+  const ok = got === want;
+  return {cls: ok ? " hit" : " miss",
+          html: `<span class="exp">${ok ? "○" : "×"} 期待 ${want}</span>`};
+}
+
+/* 照合の要約を出す。何本中何本が一致したか。 */
+function renderExpectStat(seq){
+  const box = el("expectStat"); if(!box) return;
+  const exp = expectedNotes();
+  if(!exp){ box.textContent = ""; return; }
+  let hit = 0, n = Math.min(exp.length, seq.length);
+  for(let i=0;i<n;i++) if(seq[i] && seq[i].note && seq[i].note.disp === exp[i]) hit++;
+  box.textContent = `期待 ${exp.length}本 ／ 吹いた ${seq.length}本 ／ 一致 ${hit}本`
+    + (exp.length !== seq.length ? "（本数が違います）" : (hit === exp.length ? "（全一致）" : ""));
+}
+
+document.addEventListener("change", (e)=>{
+  if(e.target && e.target.id === "autoFile" && e.target.files && e.target.files[0]){
+    autoFromFile(e.target.files[0]);
+  }
+});
+
+document.addEventListener("input", (e)=>{
+  if(e.target && e.target.id === "expectSeq"){
+    try{ renderSeq(); }catch{}
+    try{ renderAutoSeq(); }catch{}
+    try{ renderOneSeq(); }catch{}
+  }
+});
+
+function renderSeq(){
+  const box = el("seq"); box.innerHTML="";
+  cap.seq.forEach((s,i)=>{
+    const div = document.createElement("div");
+    const cmp = compareOne(i, s.note);
+    div.className = "chip" + (i===0?" ref":"") + (s.freq==null?" empty":"") + cmp.cls;
+    div.innerHTML = `<div class="idx">${i+1}${i===0?" 基準":""}</div>`+
+      `<div class="nm">${s.note?s.note.disp:"—"}${s.note&&s.note.abs!==s.note.disp?`<span class="cents"> (絶${s.note.abs})</span>`:""}</div>`+
+      compareOne(i, s.note).html+
+      `<div class="fz">${s.freq?Math.round(s.freq)+"Hz":"無音"}</div>`+cmp.html;
+    box.appendChild(div);
+  });
+  renderExpectStat(cap.seq);
+}
+
+// --- 無音区切りで自動送りするモード ---
+// 笛と笛の間に短い無音を置くだけで次の桁へ進む。拍にもボタン操作にも縛られない。
+/* 入力の終わりは利用者が決める。システムは秘密の本数を知らないし、知ろうと
+ * もしない。桁数に達したら自動で確定する、照合が通ったら止まる、といった
+ * つくりは、利用者に桁数を暗黙に教えてしまうため採らない。 */
+const auto = {active:false, seg:null, seq:[], t0:0};
+
+function renderAutoSeq(){
+  const box = el("autoSeq"); box.innerHTML="";
+  // 有効なものだけに通し番号を振る。無効なものは番号を持たない（本数がずれない）。
+  let n = 0;
+  auto.seq.forEach((s,i)=>{
+    const live = !s.off;
+    const idx = live ? n++ : null;
+    const div=document.createElement("div");
+    div.className="chip"+(idx===0?" ref":"")+(s.skipped?" empty":"")+(live?"":" off");
+    const cmp = live ? compareOne(idx, s.skipped?null:s.note) : {cls:"", html:""};
+    div.className += cmp.cls;
+    div.innerHTML=`<div class="idx">${live?(idx+1)+(idx===0?" 基準":""):"除外"}</div>`+
+      `<div class="nm">${s.skipped?"飛":(s.note?s.note.disp:"—")}${!s.skipped&&s.note&&s.note.abs!==s.note.disp?`<span class="cents"> (絶${s.note.abs})</span>`:""}</div>`+
+      cmp.html+
+      `<div class="fz">${s.skipped?"鳴らず":(s.freq?Math.round(s.freq)+"Hz":"—")}${s.durationMs?" "+Math.round(s.durationMs)+"ms":""}</div>`+
+      (s.why?`<span class="why">${s.why}</span>`:"")+
+      (s.warn?`<span class="why warn">${s.warn}</span>`:"");
+    div.title = "クリックで" + (live ? "この音を除外" : "この音を戻す");
+    div.addEventListener("click", ()=>{
+      auto.seq[i].off = live;
+      auto.seq[i].byHand = true;      // 手で決めたものは、以後の自動判定で覆さない
+      renderAutoSeq();
+    });
+    box.appendChild(div);
+  });
+  renderExpectStat(auto.seq.filter(s=>!s.off));
+}
+
+/* 吹き終わったところで、テンポを手がかりに雑音を見分ける。
+ * 判断は提案であって決定ではない。結果は画面に理由つきで出し、クリックで覆せる。 */
+function autoTempoPass(){
+  if(!window.TempoFilter || auto.seq.length < 3) return;
+  const ev = auto.seq.map(s=>({kind: s.kind || (s.skipped ? "skip" : "note"),
+                               freq: s.freq, durationMs: s.durationMs, startMs: s.startMs}));
+  const r = window.TempoFilter.analyze(ev, {});
+  if(!r.beatMs){ el("autoTempo").textContent = r.note || ""; return; }
+  let dropped = 0, skipped = 0;
+  r.items.forEach((it, i)=>{
+    if(auto.seq[i].skipped) return;              // 手で空けたものは触らない
+    if(auto.seq[i].byHand) return;               // 手で決めたものは覆さない
+    if(it.action === "skip"){
+      // [* 拍には来たのに読めなかった＝そこに笛はあったが鳴らなかった]。
+      // 除外して詰めると本数が1つ減り、パリティで直せる誤りを直せなくなる。
+      // 位置を保ったまま消失として扱い、誤り訂正に任せる（栗原さんの指摘・2026-08-06）。
+      auto.seq[i].off = false;
+      auto.seq[i].skipped = true;
+      auto.seq[i].freq = null;
+      auto.seq[i].note = null;
+      skipped++;
+    } else {
+      const want = (it.action === "drop");
+      if(auto.seq[i].off !== want){ auto.seq[i].off = want; if(want) dropped++; }
+    }
+    if(it.reason) auto.seq[i].why = it.reason;
+    if(it.warn) auto.seq[i].warn = it.warn;
+  });
+
+  // 拍の位置に音がまったく来なかったところにも、鳴らない笛として飛ばしを挿す
+  let inserted = 0;
+  if(r.missing && r.missing.length){
+    for(const m of r.missing){
+      // その拍より後ろにある最初の要素の直前へ挿す（時刻の順を保つ）
+      let at = auto.seq.findIndex(s => s.startMs != null && s.startMs > m.startMs);
+      if(at < 0) at = auto.seq.length;
+      auto.seq.splice(at, 0, {freq:null, note:null, skipped:true, startMs:m.startMs,
+                              kind:"missing", why:m.reason});
+      inserted++;
+    }
+  }
+
+  const parts = [];
+  if(skipped) parts.push(skipped + "本を鳴らない笛として飛ばしました");
+  if(inserted) parts.push(inserted + "本ぶん、音が来なかった拍に飛ばしを入れました");
+  if(dropped) parts.push(dropped + "本を雑音として除きました");
+  el("autoTempo").textContent = "テンポは約" + Math.round(r.beatMs) + "ms。"
+    + (parts.length ? parts.join("／") + "（クリックで戻せます）。"
+                    : "拍から外れた音はありませんでした。");
+  renderAutoSeq();
+}
+// 開始と終了は同じボタンで兼ねる。押すたびにラベルと色が入れ替わる。
+/* 記録した1回ぶんの測定値を、集計器 fue/calib_comb.py がそのまま読める形で
+ * コンソールへ書き出す。画面の札を目視で書き写す手間をなくすためである。
+ * 1回の吹鳴（コーム1周）が1つのまとまりになるので、出たものをそのまま
+ * つなげて貼れば、複数回ぶんの測定値ファイルになる。
+ * 鳴らなかった笛（飛ばした笛）は - で位置を保つ。 */
+function logMeasurements(seq, how){
+  if(!seq || !seq.length) return;
+  const vals = seq.map(s => (s.skipped || !s.freq) ? "-" : s.freq.toFixed(1));
+  const skipped = seq.filter(s => s.skipped || !s.freq).length;
+  const d = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  const stamp = d.getFullYear() + "-" + pad(d.getMonth()+1) + "-" + pad(d.getDate())
+    + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+  const head = ["# " + stamp, how, seq.length + "本"];
+  if(skipped) head.push("うち鳴らず" + skipped + "本");
+  if(how === "続けて吹く"){
+    head.push("区切り " + (el("pitchSplit").checked
+      ? el("splitRange").value + "セント/" + el("gapRange").value + "ms"
+      : el("gapRange").value + "ms"));
+  }
+  const lines = [head.join("  ")];
+  for(let i=0; i<vals.length; i+=12) lines.push(vals.slice(i, i+12).join(" "));
+  console.log(lines.join("\n"));
+}
+function autoSetButton(){
+  const b = el("autoStartBtn");
+  b.textContent = auto.active ? "終了し復号" : "開始";
+  b.classList.toggle("ok", auto.active);
+  el("autoUndoBtn").disabled = !(auto.active && auto.seq.length);
+  el("autoSkipBtn").disabled = !auto.active;
+}
+/* 鳴らない笛を「飛ばす」。その位置に、どのスロットにも当てはまらない周波数を
+ * 置いておくと、復号器がそこを消失として扱う。並びが1本短くなる「欠落」は
+ * 誤り訂正では直せないが、位置を保った「消失」なら検査用の笛で埋められる。
+ * 音域の1オクターブ下を使うので、どの設定でも必ず範囲外になる。 */
+function skipPlaceholderFreq(){
+  try{
+    const lo = (cipherConfig && cipherConfig.lo_note) || "G#6";
+    return window.CipherCodec.noteToFreq(lo) / 2;
+  }catch{ return 100; }
+}
+function autoSkip(){
+  if(!auto.active) return;
+  auto.seq.push({freq: null, note: null, skipped: true});
+  renderAutoSeq();
+  autoSetButton();
+  el("autoDot").textContent = String(auto.seq.length);
+  el("autoHint").textContent = auto.seq.length + "本目を「鳴らない」として空けました。次の笛へ進んでください。";
+  if(navigator.vibrate) navigator.vibrate([15,40,15]);
+}
+/* 区切りの設定を、画面のつまみから読む。
+ * マイクのときも録音ファイルのときも[* まったく同じ設定]を使いたいので、1か所にまとめる。 */
+function autoOptions(){
+  return Object.assign({}, segOptions, {
+    gapMs: parseInt(el("gapRange").value, 10),
+    // 音の変わり目でも区切るかは、始めるたびにチェックの状態から読む
+    pitchSplitCents: el("pitchSplit").checked ? parseInt(el("splitRange").value, 10) : 0,
+    pitchStableMs: parseInt(el("stableRange").value, 10),
+    minNoteMs: parseInt(el("minnoteRange").value, 10),
+    endMs: Number.MAX_SAFE_INTEGER});
+}
+
+/* 録音した音声を、マイクと同じ道筋で解析する。
+ *
+ * その場のマイクだけだと、うまく読めなかったときに何が起きていたのかを調べ直せない。
+ * 録音を読めれば、同じ音で何度でも試せる（2026-08-06に足した）。
+ * 音の切り分けは silence_segmenter を、雑音の見分けは tempo_filter を、
+ * どちらもマイクのときとまったく同じものを使う。違うのは音の出どころだけである。 */
+const FILE_CLARITY = 0.72;      // 録音を読むときの、音の明瞭さのしきい値
+async function autoFromFile(file){
+  const st = el("autoFileStatus");
+  st.textContent = "読み込んでいます…";
+  try{
+    const buf = await file.arrayBuffer();
+    const ctx = new (window.OfflineAudioContext || window.webkitOfflineAudioContext)(1, 1, 44100);
+    const audio = await ctx.decodeAudioData(buf);
+    const sr = audio.sampleRate;
+    const x = audio.getChannelData(0);
+
+    // [* 窓は短くする]。8192（約186ms）だと、息を切らずに続けて吹いたときの
+    // 音の変わり目が窓の中で平均化されてしまい、2本の笛が1つの音に繋がる。
+    // 実際、スプールの録音で1309ms（拍の2.3倍）の音ができた（2026-08-06）。
+    // 4096（約93ms）なら変わり目を追える。
+    const WIN = 4096, HOP = Math.round(sr * 0.011);   // 約11ms（画面更新とほぼ同じ間合い）
+    const det = PitchDetector.forFloat32Array(WIN);
+    const buf2 = new Float32Array(det.inputLength);
+    const seg = window.SilenceSegmenter.create(autoOptions());   // マイクのときと同じ設定
+    auto.seq = [];
+    refMeasuredHz = null;
+
+    for(let i = 0; i + WIN < x.length; i += HOP){
+      buf2.set(x.subarray(i, i + WIN));
+      const [pitch, clarity] = det.findPitch(buf2, sr);
+      // 帯域レベルの代わりに、その窓の実効値を dB にして渡す
+      let e = 0;
+      for(let k = 0; k < WIN; k++) e += x[i+k] * x[i+k];
+      const db = 20 * Math.log10(Math.sqrt(e / WIN) + 1e-12);
+      // 録音は取り込みと書き出しを経ているぶん、マイク直より音の明瞭さが落ちる。
+      // ここだけしきい値を緩める（マイクのときは0.9のまま）。
+      const f = (clarity > FILE_CLARITY && pitch >= loFloorHz) ? pitch : 0;
+      const t = i / sr * 1000;
+      const ev = seg.feed(t, db, f);
+      if(ev.type === "note"){
+        const nt = ev.freq ? freqToNote(ev.freq) : null;
+        if(ev.freq && !nt){
+          // [* 音域の外だからといって、列から消してはいけない]。消すと位置が詰まり、
+          // 以降の並びがすべてずれる。読めなかった印を付けて列に残し、
+          // 拍に乗っているかどうかの判断（＝飛ばしか雑音か）はテンポ判定に任せる。
+          auto.seq.push({freq: ev.freq, note: null, kind:"reject", off:true,
+                         why:"符号の音域から外れた（" + Math.round(ev.freq) + "Hz）",
+                         durationMs: ev.durationMs, startMs: ev.startMs});
+          continue;
+        }
+        if(ev.freq && auto.seq.length === 0) refMeasuredHz = ev.freq;
+        auto.seq.push({freq: ev.freq, note: nt, kind:"note",
+                       durationMs: ev.durationMs, startMs: ev.startMs});
+      } else if(ev.type === "reject" && (ev.freq || ev.durationMs)){
+        auto.seq.push({freq: ev.freq || null, note: ev.freq ? freqToNote(ev.freq) : null,
+                       kind:"reject", off:true, why: ev.reason || "短すぎた",
+                       durationMs: ev.durationMs, startMs: ev.startMs});
+      }
+    }
+    st.textContent = file.name + " … " + auto.seq.filter(s=>!s.off).length + "本を読み取りました。";
+    renderAutoSeq();
+    autoTempoPass();                                  // テンポで雑音を見分ける
+    const live = auto.seq.filter(s=>!s.off);
+    const ph = skipPlaceholderFreq();
+    cipherFreqs = live.map(s => s.skipped ? ph : s.freq);
+    logMeasurements(live, "録音ファイル");
+    doDecode();
+  }catch(e){
+    st.textContent = "読み込めませんでした（" + e.message + "）。";
+  }
+}
+
+async function autoStart(){
+  // 始められたかを返す。2-of-2 の流れが、失敗したまま「終了」待ちにならないようにするため。
+  if(!await ensureMic()){ el("autoStatus").textContent="マイクを開始できませんでした。"; return false; }
+  if(cap.active || one.active){ el("autoStatus").textContent="ほかの入力方式が動いています。先にそちらを終えてください。"; return false; }
+  // 無音による自動終了は使わない（利用者を急かさないため）。終わりはボタンで決める。
+  // 区切りの長さは画面のつまみから読む（吹いている最中の変更も効く）。
+  auto.seg = window.SilenceSegmenter.create(autoOptions());
+  auto.active=true; auto.seq=[]; auto.t0=performance.now();
+  cipherFreqs=[];
+  el("autoStatus").textContent=""; el("verdict").textContent="–"; el("decodedPayload").textContent="–";
+  el("autoDot").classList.add("prep"); el("autoDot").textContent="測定";
+  el("autoHint").textContent="部屋の静けさを測っています。少しだけ静かにしてください。";
+  autoSetButton();
+  renderAutoSeq();
+  return true;
+}
+function autoStop(){
+  auto.active=false;
+  el("autoDot").classList.remove("on","prep"); el("autoDot").textContent="–";
+  el("autoLevel").style.width="0%";
+  autoSetButton();
+}
+function autoEnd(){
+  autoStop();
+  if(!auto.seq.length){ el("autoStatus").textContent="1本も入っていません。"; return; }
+  const ph = skipPlaceholderFreq();
+  autoTempoPass();                                    // テンポを見て雑音を見分ける
+  const live = auto.seq.filter(s=>!s.off);            // 除外したものは復号に使わない
+  const skipped = live.filter(s=>s.skipped).length;
+  const dropped = auto.seq.length - live.length;
+  cipherFreqs = live.map(s => s.skipped ? ph : s.freq);
+  logMeasurements(live, "続けて吹く");
+  el("autoStatus").textContent = live.length + "本を記録しました"
+    + (dropped ? "（" + dropped + "本は雑音として除きました）" : "")
+    + (skipped ? "（うち" + skipped + "本は鳴らないものとして空けました）" : "") + "。復号します。";
+  // 2-of-2 / 2-of-3 の途中なら、通常の照合ではなく断片として受け取る
+  if(share.capturing){ shareCapture(); return; }
+  if(thr.capturing){ thrCapture(); return; }
+  doDecode();
+}
+function autoToggle(){ auto.active ? autoEnd() : autoStart(); }
+// 直前の1本を取り消す。咳や物音が1本として入ってしまったときに使う。
+function autoUndo(){
+  if(!auto.seq.length) return;
+  auto.seq.pop();
+  renderAutoSeq();
+  autoSetButton();
+  el("autoDot").textContent = auto.seq.length ? String(auto.seq.length) : "待機";
+  el("autoHint").textContent = auto.seq.length
+    ? "直前の1本を取り消しました。いまは"+auto.seq.length+"本です。"
+    : "すべて取り消しました。1本目から吹いてください。";
+  if(navigator.vibrate) navigator.vibrate(15);
+}
+function autoClear(){
+  autoStop();
+  auto.seq=[]; auto.seg=null;
+  el("autoStatus").textContent="";
+  el("autoHint").textContent="開始すると、まず部屋の静けさを0.4秒ほど測り、そこを基準に区切りを判定します。";
+  autoSetButton();
+  renderAutoSeq();
+}
+
+// --- 2-of-2（2枚のカードを合わせる） ---
+/* 秘密を2つに分けた断片を、1枚ずつ読んで足し合わせる。読み取りそのものは
+ * 「2. 続けて吹く」と同じ仕組みを使い、確定したところで通常の照合へ渡さず
+ * こちらで受け取る。2枚そろった時点で合成し、認証まで進む。 */
+const share = {capturing:false, cards:[]};
+const SHARE_LABEL = ["1枚目", "2枚目"];
+function shareRender(){
+  const box = el("shareSeq"); box.innerHTML = "";
+  share.cards.forEach((c, i) => {
+    const d = document.createElement("div");
+    d.className = "chip";
+    d.innerHTML = '<div class="idx">' + SHARE_LABEL[i] + '</div>'
+      + '<div class="nm" style="font-size:.95rem">' + c.symbols.join(",") + '</div>'
+      + '<div class="fz">' + c.count + '本</div>';
+    box.appendChild(d);
+  });
+  const b = el("shareBtn");
+  const which = SHARE_LABEL[Math.min(share.cards.length, 1)];
+  b.textContent = share.capturing ? which + "を終了し復号" : which + "を吹く（開始）";
+  b.classList.toggle("ok", share.capturing);
+  b.disabled = share.cards.length >= 2;
+}
+async function shareToggle(){
+  if(share.cards.length >= 2) return;
+  if(share.capturing){ autoEnd(); return; }      // autoEnd から shareCapture が呼ばれる
+  el("shareStatus").textContent = SHARE_LABEL[share.cards.length] + "を、ストラップ穴側の端から順に吹いてください。";
+  share.capturing = await autoStart() === true;  // 始められなかったときは待ちに入らない
+  if(!share.capturing) el("shareStatus").textContent = "マイクを開始できませんでした。上のマイク開始を押してから、もう一度試してください。";
+  shareRender();
+}
+async function shareCapture(){
+  share.capturing = false;
+  const result = window.CipherCodec.decode(cipherFreqs, cipherConfig, true);
+  if(result.status.startsWith("error:")){
+    el("shareStatus").textContent = SHARE_LABEL[share.cards.length] + "を読めませんでした（"
+      + result.status + "）。もう一度吹いてください。";
+    shareRender();
+    return;
+  }
+  share.cards.push({symbols: result.symbols || [], count: cipherFreqs.length});
+  el("shareStatus").textContent = SHARE_LABEL[share.cards.length - 1] + "を読み取りました（" + result.status + "）。"
+    + (share.cards.length < 2 ? "続けて2枚目を吹いてください。" : "");
+  shareRender();
+  if(share.cards.length >= 2) await shareCombine();
+}
+async function shareCombine(){
+  try{
+    const m = window.CipherCodec.slots(cipherConfig).length;
+    const base = window.CipherCodec._wireParams(cipherConfig, m).mb;
+    const got = window.CipherCodec.combineShares(share.cards.map(c => c.symbols), base);
+    el("shareSecret").textContent = got.value + "（記号 " + got.digits.join(",") + "）";
+    const canonical = Uint8Array.from(got.digits);
+    const configured = !!(packEnc || gotoEnc || el("cipherHash").value.trim());
+    if(configured){
+      await verifyCanonical(canonical, "shareVerdict");
+    }else{
+      // 照合用の値が渡されていないデモでは、2枚そろって復元できたこと自体を成功として示す
+      el("shareVerdict").innerHTML = '<span class="okmark">2枚がそろい、秘密を復元しました</span>'
+        + ' <span class="muted">（照合用の値が無いので、値そのものを表示しています）</span>';
+      el("successSub").textContent = "2枚を合わせた秘密は " + got.value + " です";
+      el("successGo").style.display = "none";
+      el("successOverlay").classList.add("show");
+    }
+    el("shareStatus").textContent = "2枚がそろいました。やり直すときは「やり直す」を押してください。";
+  }catch(e){
+    el("shareSecret").textContent = "–";
+    el("shareVerdict").innerHTML = '<span class="ngmark">合わせられません（' + e.message + '）</span>';
+  }
+}
+function shareClear(){
+  if(share.capturing) autoStop();
+  share.capturing = false;
+  share.cards = [];
+  el("shareStatus").textContent = "";
+  el("shareSecret").textContent = "–";
+  el("shareVerdict").textContent = "–";
+  autoClear();
+  shareRender();
+}
+
+// --- 2-of-3（しきい値秘密分散） ---
+/* 3つのうち2つで開く分け方。担体には番号が彫ってあり、その番号が復元の計算に要る
+ * （ラグランジュ補間のどの点かを決めるため）。番号を取り違えると別の値が出るので、
+ * 吹く前に画面で選んでもらう。読み取りそのものは「2. 続けて吹く」と同じ仕組みを使う。 */
+const thr = {capturing:false, picked:[], index:1};
+function thrRender(){
+  const box = el("thSeq"); box.innerHTML = "";
+  thr.picked.forEach(c => {
+    const d = document.createElement("div");
+    d.className = "chip";
+    d.innerHTML = '<div class="idx">番号' + c.x + '</div>'
+      + '<div class="nm" style="font-size:.95rem">' + c.symbols.join(",") + '</div>'
+      + '<div class="fz">' + c.count + '本</div>';
+    box.appendChild(d);
+  });
+  const b = el("thBtn");
+  b.textContent = thr.capturing ? "終了し読む" : "この担体を吹く（開始）";
+  b.classList.toggle("ok", thr.capturing);
+  b.disabled = thr.picked.length >= 9;
+  el("thIndex").disabled = thr.capturing;
+}
+async function thrToggle(){
+  if(thr.picked.length >= 9) return;
+  if(thr.capturing){ autoEnd(); return; }
+  thr.index = parseInt(el("thIndex").value, 10);
+  if(thr.picked.some(c => c.x === thr.index)){
+    el("thStatus").textContent = "番号" + thr.index + "はすでに読み取っています。別の番号を選んでください。";
+    return;
+  }
+  el("thStatus").textContent = "番号" + thr.index + "の担体を、最初の笛から順に吹いてください。";
+  thr.capturing = await autoStart() === true;
+  if(!thr.capturing) el("thStatus").textContent = "マイクを開始できませんでした。上のマイク開始を押してから、もう一度試してください。";
+  thrRender();
+}
+async function thrCapture(){
+  thr.capturing = false;
+  const result = window.CipherCodec.decode(cipherFreqs, cipherConfig, true);
+  if(result.status.startsWith("error:")){
+    el("thStatus").textContent = "番号" + thr.index + "を読めませんでした（" + result.status + "）。もう一度吹いてください。";
+    thrRender();
+    return;
+  }
+  thr.picked.push({x: thr.index, symbols: result.symbols || [], count: cipherFreqs.length});
+  el("thStatus").textContent = "番号" + thr.index + "を読み取りました（" + result.status + "）。"
+    + (thr.picked.length < 2 ? "もう1つ、別の番号の担体を吹いてください。" : "");
+  thrRender();
+  if(thr.picked.length >= 2) await thrCombine();
+}
+async function thrCombine(){
+  try{
+    const m = window.CipherCodec.slots(cipherConfig).length;
+    const base = window.CipherCodec._wireParams(cipherConfig, m).mb;
+    const got = window.CipherCodec.combineThreshold(
+      thr.picked.map(c => ({x: c.x, symbols: c.symbols})), base);
+    el("thSecret").textContent = got.value + "（記号 " + got.digits.join(",") + "）";
+    const canonical = Uint8Array.from(got.digits);
+    const configured = !!(packEnc || gotoEnc || el("cipherHash").value.trim());
+    if(configured){
+      await verifyCanonical(canonical, "thVerdict");
+    }else{
+      el("thVerdict").innerHTML = '<span class="okmark">2つがそろい、秘密を復元しました</span>'
+        + ' <span class="muted">（照合用の値が無いので、値そのものを表示しています）</span>';
+      el("successSub").textContent = "2つを合わせた秘密は " + got.value + " です";
+      el("successGo").style.display = "none";
+      el("successOverlay").classList.add("show");
+    }
+    el("thStatus").textContent = "2つそろいました。3つ目も足せます（値は変わりません）。";
+  }catch(e){
+    el("thSecret").textContent = "–";
+    el("thVerdict").innerHTML = '<span class="ngmark">合わせられません（' + e.message + '）</span>';
+  }
+}
+function thrClear(){
+  if(thr.capturing) autoStop();
+  thr.capturing = false;
+  thr.picked = [];
+  el("thStatus").textContent = "";
+  el("thSecret").textContent = "–";
+  el("thVerdict").textContent = "–";
+  autoClear();
+  thrRender();
+}
+
+// --- 1文字ずつモード ---
+const one = {active:false, cand:null, seq:[]};
+function renderOneSeq(){
+  const box = el("oneSeq"); box.innerHTML="";
+  one.seq.forEach((s,i)=>{
+    const div=document.createElement("div");
+    div.className="chip"+(i===0?" ref":"");
+    div.innerHTML=`<div class="idx">${i+1}${i===0?" 基準":""}</div>`+
+      `<div class="nm">${s.note?s.note.disp:"—"}${s.note&&s.note.abs!==s.note.disp?`<span class="cents"> (絶${s.note.abs})</span>`:""}</div>`+
+      compareOne(i, s.note).html+
+      `<div class="fz">${s.freq?Math.round(s.freq)+"Hz":""}</div>`;
+    box.appendChild(div);
+  });
+  renderExpectStat(one.seq);
+}
+async function oneStart(){
+  if(!await ensureMic()){ el("oneStatus").textContent="マイクを開始できませんでした。"; return; }
+  one.active=true; one.cand=null;
+  el("oneCommitBtn").disabled=false; el("oneEndBtn").disabled=one.seq.length===0;
+  el("oneStatus").textContent="いま鳴っている音を受け付けています。良い音になったら「入力」。";
+  el("oneCand").textContent="…";
+}
+function oneCommit(){
+  if(!one.cand){ el("oneStatus").textContent="まだ音が取れていません。"; return; }
+  if(one.cand){ one.seq.push(one.cand); one.cand=null; }
+  renderOneSeq();
+  el("oneEndBtn").disabled=false;
+  el("oneStatus").textContent=one.seq.length+"本目まで確定。続けて次の音を吹いて「入力」、終わりなら「終了して復号」。";
+  el("oneCand").textContent="…";
+  if(navigator.vibrate) navigator.vibrate(25);
+}
+function oneEnd(){
+  one.active=false;
+  el("oneCommitBtn").disabled=true; el("oneEndBtn").disabled=true;
+  el("oneCand").textContent="–";
+  if(!one.seq.length){ el("oneStatus").textContent="1本も入っていません。"; return; }
+  cipherFreqs = one.seq.map(s=>s.freq);
+  logMeasurements(one.seq, "1本ずつ入力");
+  el("oneStatus").textContent=one.seq.length+"本で復号します。";
+  doDecode();
+}
+function oneClear(){
+  one.active=false; one.cand=null; one.seq=[];
+  el("oneCommitBtn").disabled=true; el("oneEndBtn").disabled=true;
+  el("oneCand").textContent="–"; el("oneStatus").textContent=""; renderOneSeq();
+}
+
+function loop(){
+  analyser.getFloatTimeDomainData(inputBuf);
+  const [pitch, clarity] = detector.findPitch(inputBuf, audioCtx.sampleRate);
+  live.freq = (clarity>0.9 && pitch>=loFloorHz) ? pitch : 0;
+  live.clarity = clarity;
+  const info = live.freq ? freqToNote(live.freq) : null;
+  el("hz").textContent = live.freq ? live.freq.toFixed(1) : "–";
+  el("noteName").textContent = info ? info.disp : "–";
+  el("cents").textContent = info ? (info.cents>=0?"+":"")+info.cents+" c" : "";
+  el("clarBar").style.width = Math.round(clarity*100)+"%";
+
+  analyser.getFloatFrequencyData(freqData);
+  const binHz = audioCtx.sampleRate / analyser.fftSize;
+  const minBin = Math.floor(loFloorHz / binHz);
+  let pk=-Infinity, pki=-1;
+  for(let i=minBin;i<freqData.length;i++){ if(freqData[i]>pk){ pk=freqData[i]; pki=i; } }
+  live.peak = (pk > -75 && pki>0) ? pki*binHz : 0;
+  // 笛の音域だけの帯域レベル。低い周波数を見ないので話し声や空調に反応しにくい。
+  live.bandDb = (pki>0 && isFinite(pk)) ? pk : -120;
+
+  // 1文字モード: 最新の安定音を候補として上書き
+  if(one.active){
+    const f = live.freq || live.peak;
+    if(f){
+      const nt3 = freqToNote(f);
+      if(nt3){ one.cand = {freq:f, note:nt3}; el("oneCand").textContent = nt3.disp; }
+      else { one.cand = null; el("oneCand").textContent = "音域外 " + Math.round(f) + "Hz"; }
+    }
+  }
+
+  // 無音区切りの自動送り中
+  if(auto.active){
+    const t = performance.now() - auto.t0;
+    const f = live.freq || live.peak;
+    const ev = auto.seg.feed(t, live.bandDb, f);
+    // レベル表示（-100dBで0%、-30dBで100%）
+    el("autoLevel").style.width = Math.max(0, Math.min(100, (live.bandDb + 100) / 0.7)) + "%";
+    if(ev.type === "calibrating"){
+      el("autoDot").textContent = "測定";
+    } else if(ev.type === "onset"){
+      el("autoDot").classList.remove("prep"); el("autoDot").classList.add("on");
+      el("autoDot").textContent = String(auto.seq.length + 1);
+    } else if(ev.type === "sounding"){
+      el("autoDot").classList.add("on");
+    } else if(ev.type === "note"){
+      el("autoDot").classList.remove("on");
+      const nt2 = ev.freq ? freqToNote(ev.freq) : null;
+      if(ev.freq && !nt2){
+        // 音域の外。ここでも列から消さず、読めなかった印を付けて残す
+        // （消すと位置が詰まり、以降がずれる。飛ばしか雑音かはテンポ判定に任せる）。
+        auto.seq.push({freq: ev.freq, note: null, kind:"reject", off:true,
+                       why:"符号の音域から外れた（" + Math.round(ev.freq) + "Hz）",
+                       durationMs: ev.durationMs, startMs: ev.startMs});
+        renderAutoSeq();
+        // [* ここで return してはいけない]。この処理は requestAnimationFrame の
+        // ループ関数の中にあるので、return すると末尾の次フレーム予約へ到達せず、
+        // 画面の更新が止まってページが固まる（2026-08-06、v3で実際に起きた）。
+        el("autoHint").textContent = "符号の音域から外れた音（" + Math.round(ev.freq)
+          + "Hz）だったので数えませんでした。そのまま次の笛を吹いてください。";
+        el("autoDot").textContent = String(auto.seq.length);
+      } else {
+      if(ev.freq && auto.seq.length === 0) refMeasuredHz = ev.freq;   // 1本目＝基準笛
+      auto.seq.push({freq: ev.freq, note: nt2, kind:"note",
+                     durationMs: ev.durationMs, startMs: ev.startMs});
+      renderAutoSeq();
+      autoSetButton();
+      el("autoDot").textContent = String(auto.seq.length);
+      el("autoHint").textContent = auto.seq.length
+        + "本目まで入りました。続けて次の笛を吹き、終わったらボタンを押してください。";
+      if(navigator.vibrate) navigator.vibrate(25);
+      }
+    } else if(ev.type === "reject"){
+      // [* 捨てた音も列に残す]。あとでテンポを見て拾い直したり、人が判断したりできる。
+      // 復号には使わないので、無効の印を付けておく。
+      if(ev.freq || ev.durationMs){
+        auto.seq.push({freq: ev.freq || null, note: ev.freq ? freqToNote(ev.freq) : null,
+                       kind:"reject", off:true, why: ev.reason || "短すぎた",
+                       durationMs: ev.durationMs, startMs: ev.startMs});
+        renderAutoSeq();
+      }
+      el("autoDot").classList.remove("on");
+      el("autoHint").textContent = "短すぎる音は雑音として捨てました。もう少し長めに吹いてください。";
+    } else if(ev.type === "idle"){
+      el("autoDot").classList.remove("prep","on");
+      if(auto.seq.length === 0){
+        el("autoDot").textContent = "待機";
+        const th = auto.seg.thresholds();
+        el("autoHint").textContent = "準備できました。1本目を吹いてください（区切りの基準は "
+          + Math.round(th.onDb) + " dB）。";
+      }
+    }
+  }
+
+  // push-to-talk 中
+  if(cap.active){
+    const t = performance.now() - cap.t0;
+    if(cap.preroll){
+      // 1秒の準備。カウントダウンを表示し、まだ測定しない
+      const left = Math.ceil((PREROLL_MS - t)/1000);
+      el("beatDot").textContent = left>0 ? String(left) : "用意";
+      if(t >= PREROLL_MS){ cap.preroll=false; cap.t0=performance.now();
+        el("beatDot").classList.remove("prep"); el("pttBtn").textContent="…吹いてください（離すと復号）"; }
+    } else {
+      const spfMs = parseFloat(el("spf").value)*1000;
+      const t2 = performance.now() - cap.t0;
+      const idx = Math.floor(t2 / spfMs);
+      while(cap.windowIndex < idx){ finalizeWindow(); cap.windowIndex++; }
+      const frac = t2/spfMs - idx;
+      if(frac>0.25 && frac<0.85){
+        if(live.freq && live.clarity>0.9) cap.fs.push(live.freq);
+        if(live.peak) cap.ps.push(live.peak);
+      }
+      el("beatDot").classList.toggle("on", frac<0.18);
+      el("beatDot").textContent = idx+1;
+    }
+  }
+  raf = requestAnimationFrame(loop);
+}
+
+// --- base64url ---
+function b64urlToBytes(s){
+  s = s.replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4) s+="=";
+  const bin = atob(s); const out = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i);
+  return out;
+}
+// 秘密(canonical)を鍵に、?goto_enc を AES-GCM 復号して URL を得る（失敗=秘密が違う）
+/* c= の中身を、笛の秘密を鍵にして取り出す。中身はJSONで、遷移先URLや
+ * 成功時に見せる言葉を入れておける。AES-GCMは改ざんも検出するので、
+ * 取り出せたこと自体が「正しい秘密を吹いた」証拠になる。別に照合値を
+ * URLへ載せる必要がない。 */
+async function decryptPack(canonical){
+  try{
+    const keyRaw = await crypto.subtle.digest("SHA-256", canonical);
+    const key = await crypto.subtle.importKey("raw", keyRaw, "AES-GCM", false, ["decrypt"]);
+    const blob = b64urlToBytes(packEnc);
+    const iv = blob.slice(0,12), ct = blob.slice(12);
+    const pt = await crypto.subtle.decrypt({name:"AES-GCM", iv}, key, ct);
+    const obj = JSON.parse(new TextDecoder().decode(pt));
+    if(obj && typeof obj === "object") return obj;
+    return null;
+  }catch{ return null; }
+}
+async function decryptGoto(canonical){
+  try{
+    const keyRaw = await crypto.subtle.digest("SHA-256", canonical);
+    const key = await crypto.subtle.importKey("raw", keyRaw, "AES-GCM", false, ["decrypt"]);
+    const blob = b64urlToBytes(gotoEnc);
+    const iv = blob.slice(0,12), ct = blob.slice(12);
+    const pt = await crypto.subtle.decrypt({name:"AES-GCM", iv}, key, ct);
+    const url = new TextDecoder().decode(pt);
+    return /^https?:\/\//i.test(url) ? url : "";
+  }catch{ return ""; }
+}
+function showSuccess(url){
+  el("gotoBtn").href = url; el("gotoWrap").style.display = "";
+  // 成功の表示は画面全体を覆うため、その中にも進む手段を出しておく。
+  // 自動遷移がブラウザの都合で働かなくても、押せば進める。
+  el("successGo").href = url; el("successGo").style.display = "";
+  if(autoNav){
+    el("gotoNote").textContent = "数秒後に自動で移動します。移動しないときは上のボタンを押してください。";
+    el("successSub").textContent = "秘密のページへ移動します…";
+    el("successOverlay").classList.add("show");
+    setTimeout(()=>{
+      // すでに利用者が閉じた、または自分で移動したなら何もしない
+      if(el("successOverlay").classList.contains("show")) location.assign(url);
+    }, 3000);
+  }else{
+    el("gotoNote").textContent = "ボタンを押すと移動します。";
+    el("successSub").textContent = "下のボタンで秘密のページへ進めます。";
+    el("successOverlay").classList.add("show");
+  }
+}
+
+async function doDecode(){
+  const status = el("decodeStatus");
+  el("verdict").textContent="–"; el("gotoWrap").style.display="none";
+  if(!cipherConfig){ status.textContent="復号設定を読み込み中です"; return; }
+  if(!cipherFreqs.length){ status.textContent="先に測ってください"; return; }
+  const result = window.CipherCodec.decode(cipherFreqs, cipherConfig, true);
+  el("decodedPayload").textContent = result.payloadHex || (result.symbols&&result.symbols.length? result.symbols.join(",") : "（空）");
+  if(result.status.startsWith("error:")){ status.textContent=result.status; return; }
+  status.textContent = result.status + `（訂正 ${result.correctedCount}、消失 ${result.erasureCount}）`;
+  const canonical = (cipherConfig.mode === "symbols")
+      ? Uint8Array.from(result.symbols||[]) : result.payload;
+  await verifyCanonical(canonical, "verdict");
+}
+
+/* 取り出した秘密（canonical）を照合する。1枚を復号したときと、2枚を合わせたときの
+ * どちらからも呼ぶので、結果を書き込む先だけを引数で受け取る。 */
+async function verifyCanonical(canonical, verdictId){
+  const el_ = (t)=>{ el(verdictId).innerHTML = t; };
+
+  // (0) c=: 設定一式を秘密で包んだもの。取り出せたこと自体が認証成功である。
+  if(packEnc){
+    const pack = await decryptPack(canonical);
+    if(!pack){
+      el_('<span class="ngmark">中身を取り出せません（秘密が違います）</span>');
+      return;
+    }
+    const msg = (typeof pack.msg === "string") ? pack.msg : "";
+    el_('<span class="okmark">認証成功（秘密で設定を取り出しました）</span>'
+      + (msg ? ' <span class="muted">'+msg.replace(/[<>&]/g, c=>({"<":"&lt;",">":"&gt;","&":"&amp;"}[c]))+'</span>' : ""));
+    if(typeof pack.goto === "string" && /^https?:\/\//i.test(pack.goto)){
+      showSuccess(pack.goto);
+    }else if(msg){
+      // 遷移先が無い場合は言葉だけを見せる。閉じるのは利用者に任せる。
+      el("successSub").textContent = msg;
+      el("successGo").style.display = "none";
+      el("successOverlay").classList.add("show");
+    }
+    return;
+  }
+
+  // (A) ?goto_enc: 秘密で暗号化された遷移先。復号できれば「認証成功」＝自動遷移
+  if(gotoEnc){
+    const url = await decryptGoto(canonical);
+    if(url){ el_('<span class="okmark">認証成功（秘密で遷移先を復号）</span>'); showSuccess(url); }
+    else   { el_('<span class="ngmark">遷移先を復号できません（秘密が違います）</span>'); }
+    return;
+  }
+
+  // (B) 従来: ?sha256 で照合 → ?goto=平文URL へ
+  const expected = el("cipherHash").value.trim().toLowerCase();
+  if(!expected){ el_('<span class="muted">照合用SHA-256は未入力</span>'); return; }
+  if(!/^[0-9a-f]{64}$/.test(expected)){ el_('<span class="ngmark">SHA-256は64桁hexで入力してください</span>'); return; }
+  const digest = await crypto.subtle.digest("SHA-256", canonical);
+  const actual = Array.from(new Uint8Array(digest), x=>x.toString(16).padStart(2,"0")).join("");
+  const ok = actual===expected;
+  el_(ok ? '<span class="okmark">SHA-256 OK（一致）</span>'
+         : '<span class="ngmark">SHA-256 NG（不一致）</span>');
+  if(ok && gotoUrl){ showSuccess(gotoUrl); }
+}
+
+// --- イベント ---
+const ptt = el("pttBtn");
+ptt.addEventListener("pointerdown", e=>{ e.preventDefault(); try{ ptt.setPointerCapture(e.pointerId); }catch{} beginCapture(); });
+ptt.addEventListener("pointerup",   e=>{ e.preventDefault(); endCapture(); });
+ptt.addEventListener("pointercancel", ()=> endCapture());
+el("clearBtn").onclick = ()=>{ cap.seq=[]; cipherFreqs=[]; renderSeq(); el("capStatus").textContent=""; el("decodedPayload").textContent="–"; el("verdict").textContent="–"; el("decodeStatus").textContent=""; el("gotoWrap").style.display="none"; };
+el("autoStartBtn").onclick = autoToggle;
+el("autoSkipBtn").onclick = autoSkip;
+el("autoUndoBtn").onclick = autoUndo;
+el("autoClearBtn").onclick = autoClear;
+el("shareBtn").onclick = shareToggle;
+el("shareClearBtn").onclick = shareClear;
+el("thBtn").onclick = thrToggle;
+el("thClearBtn").onclick = thrClear;
+shareRender();
+thrRender();
+el("successClose").onclick = ()=>{ el("successOverlay").classList.remove("show"); };
+// 区切りの長さのつまみ。吹いている最中でも効くように、動かしたその場で反映する。
+el("gapRange").oninput = ()=>{
+  const v = parseInt(el("gapRange").value, 10);
+  el("gapVal").textContent = v + " ms";
+  if(auto.seg) auto.seg.options.gapMs = v;
+};
+// 細かい調整のつまみも、動かしたその場で反映する。
+el("splitRange").oninput = ()=>{
+  const v = parseInt(el("splitRange").value, 10);
+  el("splitVal").textContent = v + " セント";
+  if(auto.seg && el("pitchSplit").checked) auto.seg.options.pitchSplitCents = v;
+};
+el("stableRange").oninput = ()=>{
+  const v = parseInt(el("stableRange").value, 10);
+  el("stableVal").textContent = v + " ms";
+  if(auto.seg) auto.seg.options.pitchStableMs = v;
+};
+el("minnoteRange").oninput = ()=>{
+  const v = parseInt(el("minnoteRange").value, 10);
+  el("minnoteVal").textContent = v + " ms";
+  if(auto.seg) auto.seg.options.minNoteMs = v;
+};
+// 「音が変わったところでも区切る」も、吹いている最中に切り替えられる。
+el("pitchSplit").onchange = ()=>{
+  if(auto.seg) auto.seg.options.pitchSplitCents =
+    el("pitchSplit").checked ? parseInt(el("splitRange").value, 10) : 0;
+};
+el("oneStartBtn").onclick = oneStart;
+el("oneCommitBtn").onclick = oneCommit;
+el("oneEndBtn").onclick = oneEnd;
+el("oneClearBtn").onclick = oneClear;
+el("decodeBtn").onclick = doDecode;
+el("startBtn").onclick = start;
+renderSeq(); renderOneSeq();
+
+// (4) ページを開いたら自動でマイク開始を試みる（ブラウザが拒否したらボタン操作で開始）
+start();
+</script>
+</body>
+</html>
