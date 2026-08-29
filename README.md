@@ -5,7 +5,7 @@
 笛は電源も電子部品も持たない。家庭用の3Dプリンタで作れて、日用品の内部空洞として
 存在できる。読み出しに特別な装置は要らない。
 
-このリポジトリは、論文「CipherFlute（WISS 2026 投稿中）」の成果物である。
+このリポジトリは、CipherFluteプロジェクトの成果物である。
 開発は別のリポジトリで行っており、ここへはスクリプトで切り出している。
 
 ## 5分で試す
@@ -61,8 +61,7 @@ freq_hz = A / (bore_mm - e)      A = 87985.1, e = -10.010
 node decoder/cipher_codec.test.js     # ALL PASS (12 vectors)
 ```
 
-符号の詳しい仕様は [`codec/SPEC.md`](codec/SPEC.md) にある。論文の設計章より細かく、
-実装に足る記述にしてある。
+符号の詳しい仕様は [`codec/SPEC.md`](codec/SPEC.md) にある。実装に足る細かさで記述してある。
 
 **紙と鉛筆だけで誤り訂正まで行うための早見表**を [`codec/manual_decode_card.md`](codec/manual_decode_card.md)
 に置いた。位数11の有限体では2が原始根なので、10項のべき乗表と10項の対数表があれば、
@@ -147,8 +146,6 @@ node wallet/tx.test.js            # 送金（29件）
 - 形状が秘密である。3Dスキャンや写真測量で読まれうる
 - 秘匿が必要なら**秘密分散**を使う。`codec/threshold.py` にShamirの実装がある
 
-詳しくは論文の脅威モデルの章を読むこと。
-
 ## ライセンス
 
 - コード … MIT（[LICENSE](LICENSE)）
@@ -158,11 +155,10 @@ node wallet/tx.test.js            # 送金（29件）
 ## 引用
 
 ```bibtex
-@inproceedings{cipherflute2026,
-  author    = {栗原 一貴},
-  title     = {CipherFlute：特別な装置なしに復号できる3Dプリント笛による秘密情報の日用品への埋め込み},
-  booktitle = {WISS 2026},
-  year      = {2026},
-  note      = {投稿中}
+@misc{cipherflute,
+  author       = {栗原 一貴},
+  title        = {CipherFlute},
+  year         = {2026},
+  howpublished = {\url{https://github.com/qurihara/cipherflute}}
 }
 ```
