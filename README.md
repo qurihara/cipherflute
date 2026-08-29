@@ -8,6 +8,13 @@
 このリポジトリは、CipherFluteプロジェクトの成果物である。
 開発は別のリポジトリで行っており、ここへはスクリプトで切り出している。
 
+| | | |
+|---|---|---|
+| <img src="gallery/photos/spool.jpg" width="260"> | <img src="gallery/photos/karuta_front.jpg" width="260"> | <img src="gallery/photos/paircards.jpg" width="260"> |
+| <img src="gallery/photos/tiles_framed.jpg" width="260"> | <img src="gallery/photos/box_pens.jpg" width="260"> | <img src="gallery/photos/matching.jpg" width="260"> |
+
+写真の作例はどれも実機で復号まで通っている。詳しくは [`gallery/`](gallery/) を見ること。
+
 ## 5分で試す
 
 1. `flutes/uniform/` の笛を何本か印刷する（0.20mm・サポートなし・ブリム8mm前後）

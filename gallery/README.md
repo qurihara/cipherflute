@@ -29,6 +29,8 @@
 | `photos/karuta_front.jpg` | 2枚を並べたところ。右が上の句、左が下の句 |
 | `photos/karuta_back.jpg` | 上の句の札を裏返したところ。笛8本が並ぶ |
 
+<img src="photos/karuta_front.jpg" width="420"> <img src="photos/karuta_back.jpg" width="420">
+
 ## ハートを抜いた2枚組のカード
 
 同じ作りのカードを2枚、余白どうしを向かい合わせに並べ、その境界にハートを抜いた。
@@ -46,6 +48,8 @@
 |---|---|
 | `photos/paircards.jpg` | 2枚をそろえてハートが現れたところ |
 
+<img src="photos/paircards.jpg" width="640">
+
 ## カード1枚
 
 クレジットカード大の板（85.6 × 54 × 4mm）に笛8本を融合したものである。
@@ -58,6 +62,8 @@
 | `photos/card.jpg` | カード1枚。右上の印が吹き始めである |
 | `photos/card_2of3.jpg` | 2-of-3の断片を担うカード |
 
+<img src="photos/card.jpg" width="420"> <img src="photos/card_2of3.jpg" width="420">
+
 ## 枡箱
 
 枡箱の床に笛を仕込んだものである。**音の出る窓が内側へ開くので、
@@ -69,6 +75,8 @@
 |---|---|
 | `photos/box_inside.jpg` | 箱の内部。床に笛を仕込んである |
 | `photos/box_pens.jpg` | ペンを立てたところ |
+
+<img src="photos/box_inside.jpg" width="420"> <img src="photos/box_pens.jpg" width="420">
 
 カードと箱は、形の違う日用品で2-of-3の秘密分散を担う組の一部である。
 **形が違えば取り違えないので、断片に番号を振る必要がない。**
@@ -90,12 +98,28 @@
 | `photos/tiles_back.jpg` | **1枚を裏返したところ。笛9本が並ぶ** |
 | `photos/tiles_standing.jpg` | 脚を付けて自立させたところ |
 
+<img src="photos/tiles_framed.jpg" width="420"> <img src="photos/tiles_back.jpg" width="420">
+<img src="photos/tiles_standing.jpg" width="420">
+
 **絵の選び方には条件がある。タイルどうしが見分けられなければ並べ直せない。**
 絵柄の量がどのタイルでも同じくらいだと区別が付かず、反復模様も見分けにくい。
 外周に模様の帯を置くと、絵柄の乏しいタイルにも位置の手がかりが乗る。
 
 **絵柄を下向きに刷る板は、刷る段階で左右を返しておくこと。** 見るときに裏返すので、
 返さないと鑑賞時に鏡像になる。写真の作例は、これに気づく前に刷ったものなので鏡像である。
+
+## そのほかの作例（写真のみ）
+
+論文と動画に登場する作例のうち、造形データを未収録のものである。
+
+| 作例 | 何であるか |
+|---|---|
+| `photos/spool.jpg` | フィラメントのスプール。円盤2枚に笛49本で128bitを記録する |
+| `photos/bookstand.jpg` | 本立て。底板に笛36本で64bitを記録する |
+| `photos/matching.jpg` | 照合笛。12スロットの笛を1枚の板に並べ、番号を刻んである |
+
+<img src="photos/spool.jpg" width="420"> <img src="photos/bookstand.jpg" width="420">
+<img src="photos/matching.jpg" width="420">
 
 ## 権利について
 
