@@ -3,7 +3,7 @@
 このリポジトリの中身は、断りがなければ [LICENSE](LICENSE)（コード）と
 [LICENSE-assets](LICENSE-assets)（3Dデータ・写真）に従う。以下は例外と注意である。
 
-## 書体を用いた作例（かるたの読み札）
+## 書体を用いた作例（かるた札ペアキーホルダー）
 
 `gallery/models/karuta_2of2.3mf` の文字は、SIL Open Font License の毛筆書体
 Yuji Syuku で組んである。**同梱してあるのは文字の輪郭を立体にした造形データであり、
