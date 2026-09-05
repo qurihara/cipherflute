@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "このソフトウェアを引用するときは、以下のメタデータを用いること。"
+title: "CipherFlute: 3Dプリントした笛の音の高さに秘密を書き込み、吹いて読み出す"
+type: software
+authors:
+  - family-names: Kurihara
+    given-names: Kazutaka
+    affiliation: Tsuda University
+license: MIT
+repository-code: "https://github.com/qurihara/cipherflute"
+url: "https://unryu.org/cipherflute/"
+version: 1.0.0
+date-released: 2026-09-05
+keywords:
+  - CipherFlute
+  - 3D printing
+  - whistle
+  - acoustic data storage
+  - secret sharing
+  - error-correcting code

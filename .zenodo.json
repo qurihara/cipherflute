@@ -1,0 +1,24 @@
+{
+  "title": "CipherFlute: 3Dプリントした笛の音の高さに秘密を書き込み、吹いて読み出す",
+  "upload_type": "software",
+  "language": "jpn",
+  "access_right": "open",
+  "license": "MIT",
+  "creators": [
+    {
+      "name": "Kurihara, Kazutaka",
+      "affiliation": "Tsuda University"
+    }
+  ],
+  "keywords": [
+    "CipherFlute",
+    "3D printing",
+    "whistle",
+    "acoustic data storage",
+    "secret sharing",
+    "error-correcting code",
+    "hardware wallet",
+    "digital fabrication"
+  ],
+  "description": "<p>CipherFluteは、3Dプリントした笛の管の長さ（＝音の高さ）に秘密情報を符号化し、笛を吹いた音から読み出す方式と、その実装一式である。笛は電源も電子部品も持たず、家庭用の3Dプリンタで作れて、日用品の内部空洞として存在できる。読み出しはスマートフォンのWebアプリでも、ピアノや照合笛と紙の早見表による人手でも行える。</p><p>収録物: 笛の造形データと生成器、11進の差分符号とリードソロモン誤り訂正（GF(11)）による符号化・復号の実装（PythonとJavaScript）、復号Webアプリ、人手復号の早見表、大規模言語モデルのエージェントが日用品の3Dモデルに笛を埋め込むための手順書（スキル）、Shamirの秘密分散、暗号資産ウォレット（テストネットでの実験）、実機で復号まで通った作例のギャラリー。</p><p>CipherFlute encodes secret information into the pitch (bore length) of 3D-printed whistles and reads it back from the sound when the whistles are blown. This record archives the whistle models and generators, the GF(11) differential coding and Reed-Solomon error correction (Python/JavaScript), the browser-based decoder, a paper lookup table for manual decoding, an LLM-agent skill for embedding whistles into everyday objects, Shamir secret sharing, an experimental crypto-asset wallet (testnet), and a gallery of fabricated examples verified by actual decoding.</p><p>ソースコードはMIT License、3Dデータと写真はCC BY 4.0である（LICENSE-assets参照）。Web版: https://unryu.org/cipherflute/</p>"
+}
