@@ -7,6 +7,7 @@ authors:
     given-names: Kazutaka
     affiliation: Tsuda University
 license: MIT
+doi: 10.5281/zenodo.22342650
 repository-code: "https://github.com/qurihara/cipherflute"
 url: "https://unryu.org/cipherflute/"
 version: 1.0.0

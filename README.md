@@ -1,5 +1,7 @@
 # CipherFlute
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22342650.svg)](https://doi.org/10.5281/zenodo.22342650)
+
 **3Dプリントした笛の音の高さに秘密を書き込み、吹いて読み出す。**
 
 笛は電源も電子部品も持たない。家庭用の3Dプリンタで作れて、日用品の内部空洞として
