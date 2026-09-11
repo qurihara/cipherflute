@@ -20,7 +20,7 @@
 ## 5分で試す
 
 1. `flutes/uniform/` の笛を何本か印刷する（0.20mm・サポートなし・ブリム8mm前後）
-2. `decoder/index.html` をブラウザで開く
+2. 復号ページ https://unryu.org/cipherflute/cipher/ を開く（手元で動かすなら `docs/` を静的なサーバで配信して `cipher/` を開く）
 3. 「開始」を押して、印刷した笛を順に吹く
 
 音の高さが読み取れれば、その並びが記号になる。何を書き込むかは、どの笛を
@@ -32,9 +32,9 @@
 |---|---|
 | `flutes/` | 統一管長の笛12音ぶんのSTLと較正データ |
 | `codec/` | 符号の参照実装（Python）と**試験ベクタ**と仕様書、**紙の上で復号するための早見表** |
-| `decoder/` | ブラウザだけで動く復号器。検査94件つき |
+| `docs/cipher/` | ブラウザだけで動く復号ページと、秘密分散のページ。検査つき |
 | `embed/` | 日用品へ埋め込む道具と、2つの検査、**手順書2種** |
-| `wallet/` | 笛から鍵と口座を導き、送金までできるページ（**テストネットの実験**） |
+| `docs/dapp/` | 笛から鍵と口座を導き、送金までできるページ（**テストネットの実験**） |
 | `gallery/` | 作例の写真と造形データ（かるた札ペアキーホルダー・ペアカード・カード・箱・画像タイル・照合笛） |
 
 ## 笛の素材（`flutes/`）
@@ -61,13 +61,13 @@ freq_hz = A / (bore_mm - e)      A = 87985.1, e = -10.010
 ## 符号（`codec/`）
 
 **同じ仕様を2つの言語で書いてある。** `codec/cipher_codec.py`（Python）と
-`decoder/cipher_codec.js`（JavaScript）である。両者が一致していることを
+`docs/cipher/cipher_codec.js`（JavaScript）である。両者が一致していることを
 `test_vectors.json` の12件で突き合わせている。
 
 **別の言語で実装するときは、この試験ベクタで自分の実装を確かめられる。**
 
 ```bash
-node decoder/cipher_codec.test.js     # ALL PASS (12 vectors)
+node docs/cipher/cipher_codec.test.js     # ALL PASS (12 vectors)
 ```
 
 符号の詳しい仕様は [`codec/SPEC.md`](codec/SPEC.md) にある。実装に足る細かさで記述してある。
@@ -77,25 +77,30 @@ node decoder/cipher_codec.test.js     # ALL PASS (12 vectors)
 掛け算と割り算は足し算と引き算になる。手順が実装と食い違っていないかは
 `codec/verify_manual_decode.py` で確認できる。
 
-## 復号器（`decoder/`）
+## 復号ページ（`docs/cipher/`）
 
-ブラウザだけで動く。その場で吹いても、録音した音声を入力しても復号できる。
+`docs/` は GitHub Pages の配信元であり、https://unryu.org/cipherflute/ にそのまま現れる。
+ブラウザだけで動き、外部のライブラリも外部への通信も使わない。
 
-読み取りの入口は4つある。
+| ページ | 何をするか |
+|---|---|
+| `index.html` | 担体1つを吹いて秘密を復号し、照合する。入口は「続けて吹く」と「一定のテンポで吹いて、あとから読む」の2つ |
+| `share.html` | 秘密を複数の担体に分けてある場合。2-of-2 と、k-of-n（Shamirの秘密分散）の2つ |
+| `reader.js` | 2つのページが共有する読み取り部。マイクを開き、1本ずつに切り、復号と照合まで行う |
 
-- 1本ずつ確定する
-- 続けて吹いて、無音で自動送りする
-- **一定のテンポで吹いて、あとからまとめて読む**（おすすめ）
-- 録音ファイルを読み込む
+読む笛の設定（音域・基準笛・検査用の笛の本数・照合の値・遷移先）はURLの `#` の後ろで渡す。
+書き方はページの末尾に載せてある。
 
 音の高さは**笛の音域の中でいちばん強い山を追う**方式で検出する（`fft_peak.js`）。
 自己相関にもとづく方式は、符号の最低音 G#6 に無関係な値を返すことがあり、使えない。
+音は無音や音の変わり目で1本ずつに切り（`silence_segmenter.js`）、吹き終わりに、
+吹いたテンポを手がかりに雑音と鳴らなかった笛を見分ける（`tempo_filter.js`）。
 
 鳴らない笛があっても、拍を1つ空けて吹き続ければ、あとから拍を手がかりに
 「飛ばし」を入れる。誤り訂正の消失として扱われるので、検査用の笛が足りていれば復元できる。
 
 ```bash
-cd decoder && for t in fft_peak silence_segmenter tempo_filter cipher_codec; do
+cd docs/cipher && for t in fft_peak silence_segmenter tempo_filter cipher_codec threshold cardpair; do
   node $t.test.js; done
 ```
 
@@ -116,7 +121,7 @@ cd decoder && for t in fft_peak silence_segmenter tempo_filter cipher_codec; do
 
 **鳴らない物を作ってしまう失敗は、この2つでほとんど防げる。**
 
-## 暗号笛ウォレット（`wallet/`）
+## 暗号笛ウォレット（`docs/dapp/`）
 
 笛を吹くと、その場で秘密鍵が組み立てられ、ブロックチェーン上の口座が現れる。
 残高を見て、送金までできる。財布アプリは介さず、**笛から導いた鍵が直接署名する**。
@@ -129,11 +134,11 @@ cd decoder && for t in fft_peak silence_segmenter tempo_filter cipher_codec; do
 
 対処は2つある。**128bitの秘密（スプール2枚）を使う**か、**笛の秘密に持ち主が覚えている
 合言葉を混ぜて2要素にする**かである。後者はページで試せる（合言葉の既定は `demo`）。
-詳しい検討は [`wallet/DESIGN.md`](wallet/DESIGN.md) にある。
+詳しい検討は [`docs/dapp/DESIGN.md`](docs/dapp/DESIGN.md) にある。
 
 ```bash
-node wallet/flute_key.test.js     # 鍵導出（9件）
-node wallet/tx.test.js            # 送金（29件）
+node docs/dapp/flute_key.test.js     # 鍵導出（9件）
+node docs/dapp/tx.test.js            # 送金（29件）
 ```
 
 ## 印刷の設定について

@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CipherFlute 秘密分散 v1</title>
+<link rel="stylesheet" href="reader.css?v=17">
+</head>
+<body>
+<div class="wrap">
+  <h1>CipherFlute 秘密分散 <span class="ver">v1</span></h1>
+  <p class="lead">秘密を複数の担体（カード・箱・本立て・画像タイルなど）に分けてある場合の読み方です。担体を1つずつ吹き、決められた数がそろったところで秘密を合わせます。</p>
+  <p class="muted" style="margin:-.7em 0 1.2em">デモンストレーション用です。本物の秘密情報には使わないでください（理由は <a href="index.html#about">復号ページ</a> にあります）。担体が1つだけなら <a href="index.html">復号ページ</a> で読みます。</p>
+
+  <div class="card">
+    <div class="row">
+      <button id="startBtn" style="display:none">マイク開始</button>
+      <span class="status" id="status">マイクの許可を求めています…（表示が出たら「許可」してください）</span>
+    </div>
+    <div class="meter"><span class="hz"><span id="hz">–</span><span style="font-size:.9rem;color:var(--muted)"> Hz</span></span>
+      <span class="note" id="noteName">–</span><span class="cents" id="cents"></span></div>
+    <div class="clar"><i id="clarBar"></i></div>
+    <div class="muted" style="margin-top:6px">今鳴っている音の目安です。</div>
+  </div>
+
+  <h2>読み取り（担体ごとに、続けて吹く）</h2>
+  <div class="card">
+    <div class="muted">下の「2枚を合わせる」か「いくつかそろえば開く」の開始ボタンを押してから、その担体の笛を先頭から順に吹きます。1本吹くたびに一瞬息を切ると、そこが区切りとして検出されます。吹き終えたら<b>もう一度同じボタンを押して確定</b>します。鳴らない笛は「この笛は飛ばす」で位置を空けてください。</div>
+    <div class="beatwrap">
+      <div class="beatdot" id="autoDot">–</div>
+      <div style="flex:1;max-width:320px">
+        <div class="clar"><i id="autoLevel" style="width:0%"></i></div>
+        <div class="muted" id="autoHint" style="margin-top:6px">開始すると、まず部屋の静けさを0.4秒ほど測り、そこを基準に区切りを判定します。</div>
+      </div>
+    </div>
+    <div class="row" style="margin-bottom:10px">
+      <label class="muted" for="gapRange">区切りとみなす無音の長さ：</label>
+      <input type="range" id="gapRange" min="60" max="400" step="10" value="100" style="flex:1;min-width:160px">
+      <span class="muted" id="gapVal" style="font-variant-numeric:tabular-nums">100 ms</span>
+    </div>
+    <details style="margin:0 0 10px">
+      <summary class="muted">区切りの細かい調整（息を切らずに続けて吹くとき）</summary>
+      <div class="row" style="margin-top:8px">
+        <label style="display:flex;gap:8px;align-items:center;cursor:pointer">
+          <input type="checkbox" id="pitchSplit" style="width:18px;height:18px">
+          <span class="muted">音が変わったところでも区切る</span>
+        </label>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label class="muted" for="splitRange">変わり目とみなす隔たり：</label>
+        <input type="range" id="splitRange" min="10" max="200" step="5" value="80" style="flex:1;min-width:140px">
+        <span class="muted" id="splitVal">80 セント</span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label class="muted" for="stableRange">離れた音がこの時間続いたら区切る：</label>
+        <input type="range" id="stableRange" min="20" max="200" step="5" value="60" style="flex:1;min-width:140px">
+        <span class="muted" id="stableVal">60 ms</span>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <label class="muted" for="minnoteRange">これより短い音は捨てる：</label>
+        <input type="range" id="minnoteRange" min="40" max="300" step="5" value="70" style="flex:1;min-width:140px">
+        <span class="muted" id="minnoteVal">70 ms</span>
+      </div>
+    </details>
+    <div class="row">
+      <button id="autoStartBtn">開始</button>
+      <button class="sec" id="autoSkipBtn" disabled>この笛は飛ばす</button>
+      <button class="sec" id="autoUndoBtn" disabled>1本取り消す</button>
+      <button class="sec" id="autoClearBtn">やり直す</button>
+    </div>
+    <div class="seq" id="autoSeq"></div>
+    <div id="autoTempo"></div>
+    <span class="status" id="autoStatus"></span>
+  </div>
+
+  <h2>A. 2枚を合わせる（2-of-2）</h2>
+  <div class="card">
+    <div class="muted">秘密を2つに分けて2枚のカードに入れてある場合の読み方です。片方には乱数が、もう片方には「秘密−乱数」が入っているので、<b>2枚そろって初めて秘密が出ます</b>。1枚だけでは何も分かりません。<br>
+      <b>1枚ずつ別々に読みます。</b>それぞれのカードが自分の基準笛を先頭に持っているためで、2枚を続けて吹くと2枚目の基準笛がデータとして読まれてしまいます。<br>
+      検査用の笛が1本だけのカードでは、<b>途中の笛が鳴らなかったときは訂正が効きません</b>。読めなかったらそのカードを吹き直してください（何度でもやり直せます）。</div>
+    <div class="row" style="margin-top:10px">
+      <button id="shareBtn">1枚目を吹く（開始）</button>
+      <button class="sec" id="shareClearBtn">やり直す</button>
+    </div>
+    <div class="seq" id="shareSeq"></div>
+    <span class="status" id="shareStatus"></span>
+    <div class="muted big" style="margin-top:8px">合わせた秘密: <b id="shareSecret" style="color:var(--ok);word-break:break-all">–</b></div>
+    <div class="muted big" style="margin-top:4px">照合: <b id="shareVerdict">–</b></div>
+  </div>
+
+  <h2>B. いくつかそろえば開く（k-of-n の秘密分散）</h2>
+  <div class="card">
+    <div class="muted">秘密を複数に分けてある場合の読み方です。<b>決められた数だけそろえば開き、それに満たなければ何も分かりません</b>。いくつか失っても残りで復元できます。<br>
+      担体には<b>番号が彫ってあるか、作ったときに決めてあります</b>。番号は復元の計算に必要なので、吹く前に選んでください。<br>
+      例。北斎の画像タイル9枚は 2-of-9 なので、<b>どの2枚でも開きます</b>。左上から右へ1・2・3、次の行が4・5・6、最下段が7・8・9です。</div>
+    <div class="row" style="margin:12px 0">
+      <label class="muted" for="thIndex">いま吹く担体の番号：</label>
+      <select id="thIndex">
+        <option value="1">1</option><option value="2">2</option><option value="3">3</option>
+        <option value="4">4</option><option value="5">5</option><option value="6">6</option>
+        <option value="7">7</option><option value="8">8</option><option value="9">9</option>
+      </select>
+      <button id="thBtn">この担体を吹く（開始）</button>
+      <button class="sec" id="thClearBtn">やり直す</button>
+    </div>
+    <div class="seq" id="thSeq"></div>
+    <span class="status" id="thStatus"></span>
+    <div class="muted big" style="margin-top:8px">合わせた秘密: <b id="thSecret" style="color:var(--ok);word-break:break-all">–</b></div>
+    <div class="muted big" style="margin-top:4px">照合: <b id="thVerdict">–</b></div>
+  </div>
+
+  <details style="margin:24px 0 14px">
+    <summary class="muted">読む笛の設定（URLの書き方）</summary>
+    <div class="muted" style="margin-top:8px;line-height:1.9">
+      <a href="index.html">復号ページ</a> と同じ引数を <code>#</code> のあとに書きます。<b>lo</b>・<b>hi</b>・<b>ref</b>・<b>parity</b>・<b>mode</b>・<b>norepeat</b> が笛の設定、<b>sha256</b>・<b>goto</b>・<b>goto_enc</b>・<b>c</b> が合わせた秘密の照合と遷移先です。照合の値が無ければ、合わせた秘密をそのまま表示します。<br>
+      例 <code>share.html#lo=G%236&amp;hi=G7&amp;norepeat=1&amp;mode=symbols&amp;parity=2</code>
+    </div>
+  </details>
+  <p class="muted">秘密の合わせ方は <a href="cipher_codec.js">cipher_codec.js</a> の combineShares（2-of-2）と combineThreshold（k-of-n、Shamirの秘密分散）にあります。Python版は codec/threshold.py。読み取り部は <a href="reader.js">reader.js</a>。</p>
+</div>
+
+<div id="successOverlay">
+  <div class="checkring"></div>
+  <h3>認証成功</h3>
+  <div class="sub" id="successSub"></div>
+  <a id="successGo" href="#" rel="noopener" style="display:none;margin-top:16px;background:var(--ok);color:#fff;text-decoration:none;font-weight:700;border-radius:9px;padding:.8em 1.2em">秘密のページを開く →</a>
+  <button class="sec" id="successClose" style="margin-top:12px">閉じる</button>
+</div>
+
+<script src="cipher_codec.js?v=17"></script>
+<script src="silence_segmenter.js?v=17"></script>
+<script src="tempo_filter.js?v=17"></script>
+<script src="fft_peak.js?v=17"></script>
+<script src="reader.js?v=17"></script>
+<script>
+(function () {
+  const el = id => document.getElementById(id);
+  const reader = window.CipherReader.create({
+    onSequence: (freqs) => {
+      if (share.capturing) shareCapture(freqs);
+      else if (thr.capturing) thrCapture(freqs);
+      else el("autoStatus").textContent = "どの担体か決まっていません。下の開始ボタンから始めてください。";
+    },
+  });
+  function symbolBase() {
+    const m = window.CipherCodec.slots(reader.config).length;
+    return window.CipherCodec._wireParams(reader.config, m).mb;
+  }
+  function readShare(freqs, label, statusId) {
+    const result = reader.decode(freqs);
+    if (result.status.startsWith("error:")) {
+      el(statusId).textContent = label + "を読めませんでした（" + result.status + "）。もう一度吹いてください。";
+      return null;
+    }
+    return { symbols: result.symbols || [], count: freqs.length, status: result.status };
+  }
+  /* 合わせた秘密を照合する。照合の値が無いデモでは、復元できたこと自体を成功として示す。 */
+  async function finish(got, verdictId, secretId, statusId, doneText, sub) {
+    el(secretId).textContent = got.value + "（記号 " + got.digits.join(",") + "）";
+    if (reader.hasAuth()) {
+      await reader.verifyCanonical(Uint8Array.from(got.digits), verdictId);
+    } else {
+      el(verdictId).innerHTML = '<span class="okmark">' + doneText + '</span>'
+        + ' <span class="muted">（照合用の値が無いので、値そのものを表示しています）</span>';
+      reader.showOverlay(sub + got.value + " です");
+    }
+    el(statusId).textContent = doneText + "。";
+  }
+
+  // ---------------------------------------------------------------- 2-of-2
+  const share = { capturing: false, cards: [] };
+  const SHARE_LABEL = ["1枚目", "2枚目"];
+  function shareRender() {
+    const box = el("shareSeq"); box.innerHTML = "";
+    share.cards.forEach((c, i) => {
+      const d = document.createElement("div");
+      d.className = "chip";
+      d.innerHTML = '<div class="idx">' + SHARE_LABEL[i] + '</div>'
+        + '<div class="nm" style="font-size:.95rem">' + c.symbols.join(",") + '</div>'
+        + '<div class="fz">' + c.count + '本</div>';
+      box.appendChild(d);
+    });
+    const b = el("shareBtn");
+    const which = SHARE_LABEL[Math.min(share.cards.length, 1)];
+    b.textContent = share.capturing ? which + "を終了し読む" : which + "を吹く（開始）";
+    b.classList.toggle("ok", share.capturing);
+    b.disabled = share.cards.length >= 2;
+  }
+  async function shareToggle() {
+    if (share.cards.length >= 2) return;
+    if (share.capturing) { reader.autoEnd(); return; }      // 吹き終わり → onSequence → shareCapture
+    if (thr.capturing) { el("shareStatus").textContent = "k-of-n の読み取りが動いています。先にそちらを終えてください。"; return; }
+    el("shareStatus").textContent = SHARE_LABEL[share.cards.length] + "を、先頭の笛から順に吹いてください。";
+    share.capturing = await reader.autoStart() === true;
+    if (!share.capturing) el("shareStatus").textContent = "マイクを開始できませんでした。上の「マイク開始」を押してから、もう一度試してください。";
+    shareRender();
+  }
+  async function shareCapture(freqs) {
+    share.capturing = false;
+    const got = readShare(freqs, SHARE_LABEL[share.cards.length], "shareStatus");
+    if (!got) { shareRender(); return; }
+    share.cards.push(got);
+    el("shareStatus").textContent = SHARE_LABEL[share.cards.length - 1] + "を読み取りました（" + got.status + "）。"
+      + (share.cards.length < 2 ? "続けて2枚目を吹いてください。" : "");
+    shareRender();
+    if (share.cards.length >= 2) await shareCombine();
+  }
+  async function shareCombine() {
+    try {
+      const got = window.CipherCodec.combineShares(share.cards.map(c => c.symbols), symbolBase());
+      await finish(got, "shareVerdict", "shareSecret", "shareStatus", "2枚がそろい、秘密を復元しました", "2枚を合わせた秘密は ");
+    } catch (e) {
+      el("shareSecret").textContent = "–";
+      el("shareVerdict").innerHTML = '<span class="ngmark">合わせられません（' + e.message + '）</span>';
+    }
+  }
+  function shareClear() {
+    share.capturing = false; share.cards = [];
+    el("shareStatus").textContent = ""; el("shareSecret").textContent = "–"; el("shareVerdict").textContent = "–";
+    reader.autoClear(); shareRender();
+  }
+
+  // ---------------------------------------------------------------- k-of-n
+  /* 担体の番号は復元の計算に要る（Lagrange補間のどの点かを決める）。
+   * 取り違えると別の値が出るので、吹く前に選んでもらう。 */
+  const thr = { capturing: false, picked: [], index: 1 };
+  function thrRender() {
+    const box = el("thSeq"); box.innerHTML = "";
+    thr.picked.forEach(c => {
+      const d = document.createElement("div");
+      d.className = "chip";
+      d.innerHTML = '<div class="idx">番号' + c.x + '</div>'
+        + '<div class="nm" style="font-size:.95rem">' + c.symbols.join(",") + '</div>'
+        + '<div class="fz">' + c.count + '本</div>';
+      box.appendChild(d);
+    });
+    const b = el("thBtn");
+    b.textContent = thr.capturing ? "終了し読む" : "この担体を吹く（開始）";
+    b.classList.toggle("ok", thr.capturing);
+    b.disabled = thr.picked.length >= 9;
+    el("thIndex").disabled = thr.capturing;
+  }
+  async function thrToggle() {
+    if (thr.picked.length >= 9) return;
+    if (thr.capturing) { reader.autoEnd(); return; }
+    if (share.capturing) { el("thStatus").textContent = "2-of-2 の読み取りが動いています。先にそちらを終えてください。"; return; }
+    thr.index = parseInt(el("thIndex").value, 10);
+    if (thr.picked.some(c => c.x === thr.index)) {
+      el("thStatus").textContent = "番号" + thr.index + "はすでに読み取っています。別の番号を選んでください。";
+      return;
+    }
+    el("thStatus").textContent = "番号" + thr.index + "の担体を、先頭の笛から順に吹いてください。";
+    thr.capturing = await reader.autoStart() === true;
+    if (!thr.capturing) el("thStatus").textContent = "マイクを開始できませんでした。上の「マイク開始」を押してから、もう一度試してください。";
+    thrRender();
+  }
+  async function thrCapture(freqs) {
+    thr.capturing = false;
+    const got = readShare(freqs, "番号" + thr.index, "thStatus");
+    if (!got) { thrRender(); return; }
+    thr.picked.push({ x: thr.index, symbols: got.symbols, count: got.count });
+    el("thStatus").textContent = "番号" + thr.index + "を読み取りました（" + got.status + "）。"
+      + (thr.picked.length < 2 ? "もう1つ、別の番号の担体を吹いてください。" : "");
+    thrRender();
+    if (thr.picked.length >= 2) await thrCombine();
+  }
+  async function thrCombine() {
+    try {
+      const got = window.CipherCodec.combineThreshold(thr.picked.map(c => ({ x: c.x, symbols: c.symbols })), symbolBase());
+      await finish(got, "thVerdict", "thSecret", "thStatus", "そろったので秘密を復元しました", "合わせた秘密は ");
+      el("thStatus").textContent += " 3つ目以降を足しても値は変わりません。";
+    } catch (e) {
+      el("thSecret").textContent = "–";
+      el("thVerdict").innerHTML = '<span class="ngmark">合わせられません（' + e.message + '）</span>';
+    }
+  }
+  function thrClear() {
+    thr.capturing = false; thr.picked = [];
+    el("thStatus").textContent = ""; el("thSecret").textContent = "–"; el("thVerdict").textContent = "–";
+    reader.autoClear(); thrRender();
+  }
+
+  el("shareBtn").onclick = shareToggle;
+  el("shareClearBtn").onclick = shareClear;
+  el("thBtn").onclick = thrToggle;
+  el("thClearBtn").onclick = thrClear;
+  shareRender(); thrRender();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,73 @@
+/* CipherFlute 公開ページ共通の見た目（index.html・share.html） */
+:root{
+  --bg:#0f1220; --card:#1a1f36; --fg:#e8ecf5; --muted:#98a2c0;
+  --accent:#5b8cff; --ok:#37c98a; --warn:#ffb454; --ng:#ff6b6b; --line:#2b3255;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+     background:var(--bg);color:var(--fg);line-height:1.6}
+.wrap{max-width:680px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:1.35rem;margin:.2em 0}
+h2{font-size:1.05rem;margin:1.4em 0 .5em;color:var(--accent)}
+p.lead{color:var(--muted);margin:.2em 0 1em}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin:14px 0}
+button{font:inherit;border:none;border-radius:9px;padding:.7em 1.1em;cursor:pointer;color:#fff;background:var(--accent)}
+button.sec{background:#2b335c}
+button.ok{background:var(--ok)}
+button:disabled{opacity:.45;cursor:default}
+.meter{display:flex;align-items:baseline;gap:.5em;justify-content:center;margin:.3em 0}
+.hz{font-size:2.2rem;font-weight:700;font-variant-numeric:tabular-nums}
+.note{font-size:2.2rem;font-weight:700;color:var(--accent)}
+.cents{font-size:1rem;color:var(--muted)}
+.muted{color:var(--muted);font-size:.9rem}
+.status{font-size:.9rem;color:var(--warn);min-height:1.4em}
+.clar{height:6px;background:#0c0f1d;border-radius:4px;overflow:hidden;margin-top:6px}
+.clar > i{display:block;height:100%;width:0;background:var(--ok)}
+input.wide{width:100%;background:#0c0f1d;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:.55em;font-family:ui-monospace,Menlo,monospace}
+select{font:inherit;background:#0c0f1d;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:.4em}
+a{color:var(--accent)}
+.notice{background:#2a2033;border:1px solid var(--warn);border-left-width:5px;border-radius:10px;
+        padding:14px 16px;margin:14px 0;font-size:.92rem;line-height:1.75}
+.notice b{color:var(--warn)}
+.notice ul{margin:.5em 0 0;padding-left:1.3em}
+.notice li{margin:.25em 0}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.beatwrap{display:flex;align-items:center;gap:16px;justify-content:center;margin:14px 0 6px;min-height:64px}
+.beatdot,.dot{width:54px;height:54px;border-radius:50%;background:#2b335c;transition:transform .05s,background .05s;
+         display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;flex:none}
+.beatdot.on,.dot.on{background:var(--ok);transform:scale(1.18)}
+.beatdot.prep{background:var(--warn)}
+.seq{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.chip{background:#0c0f1d;border:1px solid var(--line);border-radius:9px;padding:.4em .7em;font-variant-numeric:tabular-nums;text-align:center;min-width:74px;cursor:pointer}
+.chip .idx{font-size:.7rem;color:var(--muted)}
+.chip .nm{font-size:1.1rem;font-weight:700;color:var(--accent)}
+.chip .fz{font-size:.75rem;color:var(--muted)}
+.chip.ref{border-color:var(--accent)}
+.chip.empty .nm{color:var(--ng)}
+.chip.off{opacity:.42;text-decoration:line-through}
+.big{font-size:1.1rem}
+.okmark{color:var(--ok);font-weight:700}
+.ngmark{color:var(--ng);font-weight:700}
+.why{font-size:.7em;color:#c9a86a;display:block}
+.why.warn{color:var(--ng);font-weight:600}
+#autoTempo{font-size:.85em;color:var(--accent);margin-top:6px}
+.decodedHere{margin-top:10px;padding:10px 12px;border-radius:8px;border:1px solid var(--line);background:#0f1424}
+.decodedHere.ok{border-color:var(--ok)}
+.decodedHere.ng{border-color:var(--ng)}
+.decodedHere .head{font-weight:700;font-size:1.05rem}
+.decodedHere .pay{margin-top:4px;color:var(--ok);word-break:break-all;font-size:1.05rem}
+.decodedHere .sub{margin-top:4px;color:var(--muted);font-size:.92rem}
+details > summary{cursor:pointer}
+code{background:#0c0f1d;border-radius:4px;padding:.05em .35em;font-size:.92em}
+/* 認証成功の表示（画面全体を覆う） */
+#successOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;
+  background:rgba(9,12,24,.86);z-index:50;text-align:center;padding:24px}
+#successOverlay.show{display:flex;animation:fadeIn .25s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.checkring{width:120px;height:120px;border-radius:50%;background:var(--ok);display:flex;align-items:center;justify-content:center;
+  font-size:64px;color:#fff;animation:pop .5s cubic-bezier(.2,1.4,.4,1)}
+@keyframes pop{0%{transform:scale(0)}100%{transform:scale(1)}}
+.checkring::after{content:"✓"}
+#successOverlay h3{font-size:1.5rem;margin:.6em 0 .2em}
+#successOverlay .sub{color:var(--muted)}
+.ver{font-size:.55em;vertical-align:middle;background:#2b6cb0;color:#fff;padding:2px 8px;border-radius:10px;letter-spacing:.02em}
