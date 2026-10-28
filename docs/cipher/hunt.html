@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
-<title>CipherFlute 宝探し v2</title>
+<title>CipherFlute 宝探し v2.1</title>
 <style>
   :root { --bg:#fbf7ee; --fg:#1c2430; --muted:#5d646d; --accent:#9a3b1e; --gold:#c8a04a; --line:#e5dccb; --chip:#fff; }
   @media (prefers-color-scheme: dark) { :root { --bg:#14181e; --fg:#eef1f4; --muted:#a9b0b8; --line:#333b45; --chip:#1e242c; } }
@@ -32,6 +32,7 @@
   @keyframes rise { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
   #fx { position:fixed; inset:0; pointer-events:none; }
   @media (prefers-reduced-motion: reduce) { #ring.win, #msg.win { animation:none; } }
+  #ver { position:fixed; left:0; right:0; bottom:10px; font-size:.75rem; color:var(--muted); opacity:.8; }
   #tap { position:fixed; inset:0; background:var(--bg); display:none; align-items:center; justify-content:center; }
   #tap button { background:var(--gold); color:#1c2430; border:0; border-radius:14px; padding:22px 30px; font-size:1.25rem; font-weight:700; }
 </style>
@@ -42,6 +43,7 @@
 <div id="msg">マイクを準備しています…</div>
 <div id="seq"></div>
 <button id="again">やり直す</button>
+<footer id="ver">CipherFlute 宝探し v2.1</footer>
 <canvas id="fx"></canvas>
 <div id="tap"><button id="tapBtn">タップして聞き取りを始める</button></div>
 
@@ -56,7 +58,11 @@
  * 設定は index.html と同じく # 以降（lo hi ref parity mode norepeat c splitcents gap minnote stablems）。 */
 (function () {
   "use strict";
+  // ★版の番号★ 直すたびに小さい桁を上げる（2.1 → 2.2）。画面の下端とタブの題にこの値を出す
+  const VERSION = "2.1";
   const el = id => document.getElementById(id);
+  document.title = "CipherFlute 宝探し v" + VERSION;
+  el("ver").textContent = "CipherFlute 宝探し v" + VERSION;
   const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
   const MIC_ON_DB = -75;
   const FORGET_MS = 8000;      // これだけ無音が続いたら、並びを忘れて最初から
