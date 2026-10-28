@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
-<title>CipherFlute 宝探し v2.1</title>
+<title>CipherFlute 宝探し v2.2</title>
 <style>
   :root { --bg:#fbf7ee; --fg:#1c2430; --muted:#5d646d; --accent:#9a3b1e; --gold:#c8a04a; --line:#e5dccb; --chip:#fff; }
   @media (prefers-color-scheme: dark) { :root { --bg:#14181e; --fg:#eef1f4; --muted:#a9b0b8; --line:#333b45; --chip:#1e242c; } }
@@ -43,7 +43,7 @@
 <div id="msg">マイクを準備しています…</div>
 <div id="seq"></div>
 <button id="again">やり直す</button>
-<footer id="ver">CipherFlute 宝探し v2.1</footer>
+<footer id="ver">CipherFlute 宝探し v2.2</footer>
 <canvas id="fx"></canvas>
 <div id="tap"><button id="tapBtn">タップして聞き取りを始める</button></div>
 
@@ -59,7 +59,7 @@
 (function () {
   "use strict";
   // ★版の番号★ 直すたびに小さい桁を上げる（2.1 → 2.2）。画面の下端とタブの題にこの値を出す
-  const VERSION = "2.1";
+  const VERSION = "2.2";
   const el = id => document.getElementById(id);
   document.title = "CipherFlute 宝探し v" + VERSION;
   el("ver").textContent = "CipherFlute 宝探し v" + VERSION;
@@ -103,7 +103,7 @@
     st.seq = []; render();
     st.seg = window.SilenceSegmenter.create(segOpt); st.t0 = performance.now();
     el("ring").textContent = "♪"; el("ring").className = "";
-    say(text || "笛を、基準の笛から順に吹いてください。");
+    say(text || "印のついている笛から順に吹いてください。");
   }
 
   // ---- 開けるかを試す：最後に入った笛で終わる並びのうち、基準の笛らしい音から始まるものを全部試す
@@ -204,7 +204,7 @@
     if (ev.type === "onset" || ev.type === "sounding") el("ring").className = "on";
     else if (ev.type === "idle" || ev.type === "note" || ev.type === "reject") el("ring").className = "";
     if (ev.type === "calibrating") say("周りの音を測っています。少しだけ静かに…");
-    if (ev.type === "idle" && st.seq.length === 0 && el("msg").textContent.startsWith("周り")) say("笛を、基準の笛から順に吹いてください。");
+    if (ev.type === "idle" && st.seq.length === 0 && el("msg").textContent.startsWith("周り")) say("印のついている笛から順に吹いてください。");
     if (ev.type === "note" && ev.freq && ev.freq >= st.lo && ev.freq <= st.hi) {
       st.seq.push(ev.freq); if (st.seq.length > MAX_KEEP) st.seq.shift();
       st.lastNoteAt = now;
@@ -213,7 +213,7 @@
       if (navigator.vibrate) navigator.vibrate(20);
       tryOpen();
     }
-    if (st.seq.length && now - st.lastNoteAt > FORGET_MS && !st.busy) reset("しばらく音がなかったので、最初からにしました。基準の笛から吹いてください。");
+    if (st.seq.length && now - st.lastNoteAt > FORGET_MS && !st.busy) reset("しばらく音がなかったので、最初からにしました。印のついている笛から順に吹いてください。");
     requestAnimationFrame(loop);
   }
 
