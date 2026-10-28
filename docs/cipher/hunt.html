@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>CipherFlute 宝探し v1</title>
+<style>
+  :root { --bg:#fbf7ee; --fg:#1c2430; --muted:#5d646d; --accent:#9a3b1e; --gold:#c8a04a; --line:#e5dccb; --chip:#fff; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#14181e; --fg:#eef1f4; --muted:#a9b0b8; --line:#333b45; --chip:#1e242c; } }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family:"Hiragino Sans","Noto Sans JP",sans-serif;
+         display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:16px; }
+  h1 { font-size:1.05rem; font-weight:600; color:var(--muted); margin:0 0 28px; }
+  #ring { width:132px; height:132px; border-radius:50%; border:6px solid var(--line); display:flex; align-items:center;
+          justify-content:center; font-size:2.6rem; font-weight:700; transition:border-color .1s, transform .1s; }
+  #ring.on { border-color:var(--gold); transform:scale(1.06); }
+  #ring.ok { border-color:#2e7d4f; color:#2e7d4f; }
+  #msg { font-size:1.1rem; margin:24px 0 14px; min-height:3.4em; line-height:1.7; max-width:420px; }
+  #seq { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; min-height:34px; max-width:440px; }
+  #seq span { background:var(--chip); border:1px solid var(--line); border-radius:8px; padding:4px 8px; font-size:.9rem;
+              font-variant-numeric:tabular-nums; }
+  #again { margin-top:26px; background:none; border:1px solid var(--line); color:var(--muted); border-radius:20px;
+           padding:8px 20px; font-size:.95rem; }
+  #tap { position:fixed; inset:0; background:var(--bg); display:none; align-items:center; justify-content:center; }
+  #tap button { background:var(--gold); color:#1c2430; border:0; border-radius:14px; padding:22px 30px; font-size:1.25rem; font-weight:700; }
+</style>
+</head>
+<body>
+<h1>CipherFlute 宝探し</h1>
+<div id="ring">♪</div>
+<div id="msg">マイクを準備しています…</div>
+<div id="seq"></div>
+<button id="again">やり直す</button>
+<div id="tap"><button id="tapBtn">タップして聞き取りを始める</button></div>
+
+<script src="cipher_codec.js?v=17"></script>
+<script src="silence_segmenter.js?v=17"></script>
+<script src="fft_peak.js?v=17"></script>
+<script>
+/* 宝探し専用の、いちばん簡単な復号ページ。
+ * 開いたらすぐにマイクで聞き始め、音の高さが変わったところで1本ずつに区切る。
+ * 1本入るたびに、聞き取った並びの中に c= を開ける秘密があるかを試し、開けたら移り先へ進む。
+ * c= は AES-GCM なので、正しい秘密でなければ開かない。終わりのボタンは要らない。
+ * 設定は index.html と同じく # 以降（lo hi ref parity mode norepeat c splitcents gap minnote stablems）。 */
+(function () {
+  "use strict";
+  const el = id => document.getElementById(id);
+  const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+  const MIC_ON_DB = -75;
+  const FORGET_MS = 8000;      // これだけ無音が続いたら、並びを忘れて最初から
+  const MAX_KEEP = 40;         // 並びは最後の40本まで
+
+  const frag = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const search = new URLSearchParams(location.search);
+  const q = k => frag.has(k) ? frag.get(k) : search.get(k);
+  const pack = (q("c") || "").trim();
+  const noteRe = /^[A-Ga-g][#b]?-?\d+$/;
+  const over = {};
+  if (q("mode") === "symbols" || q("mode") === "sequential") over.mode = q("mode");
+  if (/^\d+$/.test(q("parity") || "")) over.ecc_parity = parseInt(q("parity"), 10);
+  for (const [k, key] of [["ref", "reference_note"], ["lo", "lo_note"], ["hi", "hi_note"]])
+    if (noteRe.test(q(k) || "")) over[key] = q(k);
+  if (q("norepeat") === "1") over.no_repeat = true;
+  if (q("norepeat") === "0") over.no_repeat = false;
+  const num = (k, d) => /^\d+(\.\d+)?$/.test(q(k) || "") ? parseFloat(q(k)) : d;
+  // 区切りの設定は、index.html の「音が変わったところでも区切る」を入れたときの初期値と同じ
+  const segOpt = { gapMs: num("gap", 100), pitchSplitCents: num("splitcents", 80),
+                   pitchStableMs: num("stablems", 60), minNoteMs: num("minnote", 70),
+                   endMs: Number.MAX_SAFE_INTEGER };
+  if (q("onmargin")) segOpt.onMarginDb = num("onmargin", 15);
+
+  const st = { cfg: null, ctx: null, an: null, data: null, seg: null, t0: 0, seq: [], lastNoteAt: 0,
+               lo: 1200, hi: 3600, done: false, busy: false };
+  const C = () => window.CipherCodec;
+
+  function say(t) { el("msg").textContent = t; }
+  function noteName(f) {
+    const m = Math.round(69 + 12 * Math.log2(f / 440));
+    return NAMES[(m % 12 + 12) % 12] + (Math.floor(m / 12) - 1);
+  }
+  function render() {
+    el("seq").innerHTML = st.seq.map(f => "<span>" + noteName(f) + "</span>").join("");
+  }
+  function reset(text) {
+    st.seq = []; render();
+    st.seg = window.SilenceSegmenter.create(segOpt); st.t0 = performance.now();
+    el("ring").textContent = "♪"; el("ring").className = "";
+    say(text || "笛を、基準の笛から順に吹いてください。");
+  }
+
+  // ---- 開けるかを試す：最後に入った笛で終わる並びのうち、基準の笛らしい音から始まるものを全部試す
+  function b64u(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "=";
+    const b = atob(s); const o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; }
+  async function openPack(canonical) {
+    try {
+      const raw = await crypto.subtle.digest("SHA-256", canonical);
+      const key = await crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["decrypt"]);
+      const blob = b64u(pack);
+      const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: blob.slice(0, 12) }, key, blob.slice(12));
+      return JSON.parse(new TextDecoder().decode(pt));
+    } catch (_) { return null; }
+  }
+  async function tryOpen() {
+    if (!pack || st.done) return;
+    if (st.busy) { st.again = true; return; }   // 試している最中に入った笛は、終わってから試し直す
+    st.busy = true; st.again = false;
+    try {
+      const refHz = C().noteToFreq(st.cfg.reference_note);
+      const n = st.seq.length;
+      for (let i = n - 2; i >= 0; i--) {
+        if (Math.abs(1200 * Math.log2(st.seq[i] / refHz)) > 60) continue;   // 基準の笛らしくない音からは始めない
+        const r = C().decode(st.seq.slice(i), st.cfg, true);
+        if (!r || !r.status || r.status.startsWith("error:")) continue;
+        const canon = st.cfg.mode === "symbols" ? Uint8Array.from(r.symbols || []) : r.payload;
+        const p = await openPack(canon);
+        if (p) { success(p); return; }
+      }
+    } finally { st.busy = false; }
+    if (st.again && !st.done) tryOpen();
+  }
+  function success(p) {
+    st.done = true;
+    el("ring").className = "ok"; el("ring").textContent = "✓";
+    if (navigator.vibrate) navigator.vibrate([30, 60, 30]);
+    if (typeof p.goto === "string" && /^https?:\/\//i.test(p.goto)) {
+      say((p.msg || "開きました") + "…");
+      setTimeout(() => location.assign(p.goto), 700);
+    } else {
+      say(p.msg || "開きました");
+    }
+  }
+
+  // ---- 聞き取りの輪
+  function loop() {
+    if (st.done) return;
+    st.an.getFloatFrequencyData(st.data);
+    const pk = window.FftPeak.peakInBand(st.data, st.ctx.sampleRate / st.an.fftSize, st.lo, st.hi);
+    const db = pk ? pk.level : -120;
+    const f = (pk && pk.level > MIC_ON_DB) ? pk.freq : 0;
+    const now = performance.now();
+    const ev = st.seg.feed(now - st.t0, db, f);
+    if (ev.type === "onset" || ev.type === "sounding") el("ring").className = "on";
+    else if (ev.type === "idle" || ev.type === "note" || ev.type === "reject") el("ring").className = "";
+    if (ev.type === "calibrating") say("周りの音を測っています。少しだけ静かに…");
+    if (ev.type === "idle" && st.seq.length === 0 && el("msg").textContent.startsWith("周り")) say("笛を、基準の笛から順に吹いてください。");
+    if (ev.type === "note" && ev.freq && ev.freq >= st.lo && ev.freq <= st.hi) {
+      st.seq.push(ev.freq); if (st.seq.length > MAX_KEEP) st.seq.shift();
+      st.lastNoteAt = now;
+      el("ring").textContent = String(st.seq.length);
+      render(); say("聞き取っています。続けて吹いてください。");
+      if (navigator.vibrate) navigator.vibrate(20);
+      tryOpen();
+    }
+    if (st.seq.length && now - st.lastNoteAt > FORGET_MS && !st.busy) reset("しばらく音がなかったので、最初からにしました。基準の笛から吹いてください。");
+    requestAnimationFrame(loop);
+  }
+
+  async function startMic() {
+    st.ctx = st.ctx || new (window.AudioContext || window.webkitAudioContext)();
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const src = st.ctx.createMediaStreamSource(stream);
+    st.an = new AnalyserNode(st.ctx, { fftSize: 4096, smoothingTimeConstant: 0 });
+    src.connect(st.an);
+    st.data = new Float32Array(st.an.frequencyBinCount);
+    if (st.ctx.state !== "running") { try { await st.ctx.resume(); } catch (_) {} }
+  }
+  function begin() { reset(); requestAnimationFrame(loop); }
+
+  (async () => {
+    if (!pack) say("このページは、宝探しの案内にある URL から開いてください。");
+    try {
+      const base = await (await fetch("cipher_config.json")).json();
+      st.cfg = Object.assign(base, over);
+      st.lo = C().noteToFreq(st.cfg.lo_note) * Math.pow(2, -2 / 12);
+      st.hi = C().noteToFreq(st.cfg.hi_note) * Math.pow(2, 2 / 12);
+    } catch (e) { say("設定を読み込めませんでした。電波のよい場所で開き直してください。"); return; }
+    try { await startMic(); }
+    catch (e) { say("マイクを使えませんでした。ブラウザの設定でマイクを許可して、開き直してください。"); return; }
+    if (st.ctx.state === "running") { begin(); return; }
+    // iPhone などは、画面に一度触れないと音の処理が動かない
+    el("tap").style.display = "flex";
+    el("tapBtn").onclick = async () => {
+      try { await st.ctx.resume(); } catch (_) {}
+      el("tap").style.display = "none"; begin();
+    };
+  })();
+  el("again").onclick = () => { if (!st.done && st.seg) reset(); };
+})();
+</script>
+</body>
+</html>
