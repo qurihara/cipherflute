@@ -5,47 +5,102 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
-<title>CipherFlute 宝探し v2.2</title>
+<meta name="theme-color" content="#0b1026">
+<title>CipherFlute 宝探し v3.0</title>
 <style>
-  :root { --bg:#fbf7ee; --fg:#1c2430; --muted:#5d646d; --accent:#9a3b1e; --gold:#c8a04a; --line:#e5dccb; --chip:#fff; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#14181e; --fg:#eef1f4; --muted:#a9b0b8; --line:#333b45; --chip:#1e242c; } }
+  /* 世界観：夜空の下、財宝の扉を守る精霊が、魔法の笛の調べを待っている */
+  :root { --night:#0b1026; --deep:#141a3a; --gold:#e8c766; --gold2:#c8a04a; --ink:#f3ecd8; --mist:#a9b3d6; --rune:#9fe3ff; }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
-  body { margin:0; background:var(--bg); color:var(--fg); font-family:"Hiragino Sans","Noto Sans JP",sans-serif;
+  body { margin:0; color:var(--ink); overflow:hidden;
+         background: radial-gradient(ellipse at 50% 30%, #1d2550 0%, var(--night) 60%, #05070f 100%);
+         font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
          display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:16px; }
-  h1 { font-size:1.05rem; font-weight:600; color:var(--muted); margin:0 0 28px; }
-  #ring { width:132px; height:132px; border-radius:50%; border:6px solid var(--line); display:flex; align-items:center;
-          justify-content:center; font-size:2.6rem; font-weight:700; transition:border-color .1s, transform .1s; }
-  #ring.on { border-color:var(--gold); transform:scale(1.06); }
-  #ring.ok { border-color:#2e7d4f; color:#2e7d4f; }
-  #msg { font-size:1.1rem; margin:24px 0 14px; min-height:3.4em; line-height:1.7; max-width:420px; }
-  #seq { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; min-height:34px; max-width:440px; }
-  #seq span { background:var(--chip); border:1px solid var(--line); border-radius:8px; padding:4px 8px; font-size:.9rem;
-              font-variant-numeric:tabular-nums; }
-  #again { margin-top:26px; background:none; border:1px solid var(--line); color:var(--muted); border-radius:20px;
-           padding:8px 20px; font-size:.95rem; }
-  #ring.win { border-color:var(--gold); background:radial-gradient(circle, #fff6d6 0%, var(--gold) 100%); color:#7a4a00;
-              animation: pop .6s cubic-bezier(.2,1.6,.4,1) both, glow 1.2s ease-in-out .6s infinite alternate; }
-  @keyframes pop { 0% { transform:scale(.6); } 100% { transform:scale(1.25); } }
-  @keyframes glow { from { box-shadow:0 0 0 0 rgba(200,160,74,.0); } to { box-shadow:0 0 40px 14px rgba(200,160,74,.55); } }
-  #msg.win { font-size:1.7rem; font-weight:800; color:var(--accent); animation: rise .5s ease-out both; }
-  @keyframes rise { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:none; } }
-  #fx { position:fixed; inset:0; pointer-events:none; }
-  @media (prefers-reduced-motion: reduce) { #ring.win, #msg.win { animation:none; } }
-  #ver { position:fixed; left:0; right:0; bottom:10px; font-size:.75rem; color:var(--muted); opacity:.8; }
-  #tap { position:fixed; inset:0; background:var(--bg); display:none; align-items:center; justify-content:center; }
-  #tap button { background:var(--gold); color:#1c2430; border:0; border-radius:14px; padding:22px 30px; font-size:1.25rem; font-weight:700; }
+  #stars { position:fixed; inset:0; pointer-events:none; }
+  .wrap { position:relative; z-index:1; display:flex; flex-direction:column; align-items:center; width:100%; max-width:440px; }
+  h1 { font-size:.85rem; font-weight:400; letter-spacing:.35em; color:var(--mist); margin:0 0 18px; }
+  /* 魔法陣 */
+  #circle { width:190px; height:190px; position:relative; transition: filter .15s, transform .15s; }
+  #circle svg { width:100%; height:100%; overflow:visible; }
+  #circle .spin { transform-origin:100px 100px; animation: spin 40s linear infinite; }
+  #circle .spin2 { transform-origin:100px 100px; animation: spin 60s linear infinite reverse; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #circle.on { filter: drop-shadow(0 0 14px rgba(159,227,255,.85)); transform: scale(1.04); }
+  #circle.win { filter: drop-shadow(0 0 30px rgba(232,199,102,1)); }
+  #circle.win .spin { animation-duration: 3s; }
+  #core { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:2.4rem; color:var(--gold);
+          text-shadow:0 0 12px rgba(232,199,102,.8); }
+  #core.pulse { animation: pulse .45s ease-out; }
+  @keyframes pulse { 0% { transform:scale(1.5); color:var(--rune); } 100% { transform:scale(1); } }
+  /* 守り人の台詞と、普通の言葉の添え書き */
+  #say { font-size:1.2rem; line-height:1.9; margin:22px 0 6px; min-height:3.8em; text-shadow:0 0 10px rgba(0,0,0,.6);
+         white-space:pre-line; animation: fade .6s ease-out both; }
+  @keyframes fade { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  #hint { font-family:"Hiragino Sans","Noto Sans JP",sans-serif; font-size:.85rem; color:var(--mist); min-height:1.4em; margin:0 0 14px; }
+  /* 調べとして刻まれた古代文字 */
+  #runes { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; min-height:40px; }
+  #runes span { font-family:"Segoe UI Historic","Noto Sans Runic","Apple Symbols",serif; font-size:1.6rem; color:var(--rune);
+                text-shadow:0 0 8px rgba(159,227,255,.9); animation: carve .5s ease-out both; }
+  @keyframes carve { from { opacity:0; transform:scale(2); filter:blur(4px); } to { opacity:1; transform:none; filter:none; } }
+  #again { margin-top:26px; background:none; border:1px solid rgba(232,199,102,.45); color:var(--gold); border-radius:22px;
+           padding:8px 22px; font-size:.9rem; font-family:inherit; }
+  #ver { position:fixed; left:0; right:0; bottom:10px; font-family:"Hiragino Sans",sans-serif; font-size:.72rem; color:var(--mist); opacity:.6; z-index:1; }
+  /* 扉 */
+  #gate { position:fixed; inset:0; z-index:5; display:none; pointer-events:none; }
+  #gate .light { position:absolute; inset:0; background: radial-gradient(circle at 50% 50%, #fff8dc 0%, #f3d27a 25%, rgba(232,199,102,.25) 55%, rgba(11,16,38,0) 80%);
+                 opacity:0; transition: opacity 1.2s ease-out; }
+  #gate .door { position:absolute; top:0; bottom:0; width:50.5%; transition: transform 1.8s cubic-bezier(.6,0,.2,1);
+                background: linear-gradient(90deg, #2a1d10, #4a3219 45%, #2a1d10); box-shadow: inset 0 0 0 3px #c8a04a, inset 0 0 40px rgba(0,0,0,.7); }
+  #gate .door::after { content:"ᛟ"; position:absolute; top:50%; font-size:3rem; color:var(--gold); text-shadow:0 0 14px rgba(232,199,102,.9);
+                       transform:translateY(-50%); font-family:"Segoe UI Historic","Noto Sans Runic","Apple Symbols",serif; }
+  #gate .left { left:0; } #gate .left::after { right:6px; }
+  #gate .right { right:0; } #gate .right::after { left:6px; }
+  #gate.open .left { transform: translateX(-102%); } #gate.open .right { transform: translateX(102%); }
+  #gate.open .light { opacity:1; }
+  #gate .words { position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); padding:0 20px; color:#3a2400; font-size:1.45rem;
+                 line-height:1.8; font-weight:700; opacity:0; white-space:pre-line; transition: opacity 1s ease-out .9s; text-shadow:0 0 18px #fff8dc; }
+  #gate.open .words { opacity:1; }
+  #fx { position:fixed; inset:0; pointer-events:none; z-index:6; }
+  #tap { position:fixed; inset:0; z-index:8; background:rgba(5,7,15,.92); display:none; flex-direction:column; align-items:center; justify-content:center; }
+  #tap button { background:linear-gradient(#f0d58a, #c8a04a); color:#2a1a00; border:0; border-radius:14px; padding:20px 30px;
+                font-size:1.2rem; font-weight:700; font-family:inherit; box-shadow:0 0 30px rgba(232,199,102,.5); }
+  #tap p { color:var(--mist); font-family:"Hiragino Sans",sans-serif; font-size:.85rem; margin-top:14px; }
+  @media (prefers-reduced-motion: reduce) {
+    #circle .spin, #circle .spin2, #core.pulse, #say, #runes span { animation:none; }
+    #gate .door, #gate .light, #gate .words { transition:none; }
+  }
 </style>
 </head>
 <body>
-<h1>CipherFlute 宝探し</h1>
-<div id="ring">♪</div>
-<div id="msg">マイクを準備しています…</div>
-<div id="seq"></div>
-<button id="again">やり直す</button>
-<footer id="ver">CipherFlute 宝探し v2.2</footer>
+<canvas id="stars"></canvas>
+<div class="wrap">
+  <h1>財宝の扉</h1>
+  <div id="circle">
+    <svg viewBox="0 0 200 200" aria-hidden="true">
+      <defs><path id="ringpath" d="M100,100 m-78,0 a78,78 0 1,1 156,0 a78,78 0 1,1 -156,0"/></defs>
+      <circle cx="100" cy="100" r="94" fill="none" stroke="#c8a04a" stroke-width="1.5" opacity=".9"/>
+      <circle cx="100" cy="100" r="66" fill="none" stroke="#c8a04a" stroke-width="1" opacity=".7"/>
+      <g class="spin">
+        <text font-size="13" fill="#e8c766" letter-spacing="3" style="font-family:'Segoe UI Historic','Noto Sans Runic','Apple Symbols',serif">
+          <textPath href="#ringpath">ᚠᚢᚦᚨᚱᚲᚷᚹ ✦ ᚺᚾᛁᛃᛇᛈᛉᛊ ✦ ᛏᛒᛖᛗᛚᛜᛞᛟ ✦ ᚠᚢᚦᚨᚱᚲᚷᚹ ✦</textPath>
+        </text>
+      </g>
+      <g class="spin2" stroke="#c8a04a" stroke-width="1" fill="none" opacity=".75">
+        <polygon points="100,38 154,131 46,131"/>
+        <polygon points="100,162 46,69 154,69"/>
+      </g>
+    </svg>
+    <div id="core">✦</div>
+  </div>
+  <div id="say">扉が目を覚まそうとしている……</div>
+  <div id="hint">マイクを準備しています。</div>
+  <div id="runes"></div>
+  <button id="again">はじめから奏で直す</button>
+</div>
+<footer id="ver">CipherFlute 宝探し v3.0</footer>
+<div id="gate"><div class="light"></div><div class="door left"></div><div class="door right"></div><div class="words" id="gateWords"></div></div>
 <canvas id="fx"></canvas>
-<div id="tap"><button id="tapBtn">タップして聞き取りを始める</button></div>
+<div id="tap"><button id="tapBtn">扉の前に立つ</button><p>タップすると、笛の聞き取りを始めます。</p></div>
 
 <script src="cipher_codec.js?v=17"></script>
 <script src="silence_segmenter.js?v=17"></script>
@@ -55,18 +110,33 @@
  * 開いたらすぐにマイクで聞き始め、音の高さが変わったところで1本ずつに区切る。
  * 1本入るたびに、聞き取った並びの中に c= を開ける秘密があるかを試し、開けたら移り先へ進む。
  * c= は AES-GCM なので、正しい秘密でなければ開かない。終わりのボタンは要らない。
+ * 画面は「財宝の扉を守る精霊（守り人）が、魔法の笛の調べを待つ」という見立てで作ってある。
+ * 守り人の台詞（大きな文字）の下に、していただくことを普通の言葉で添える。
  * 設定は index.html と同じく # 以降（lo hi ref parity mode norepeat c splitcents gap minnote stablems）。 */
 (function () {
   "use strict";
-  // ★版の番号★ 直すたびに小さい桁を上げる（2.1 → 2.2）。画面の下端とタブの題にこの値を出す
-  const VERSION = "2.2";
+  // ★版の番号★ 直すたびに小さい桁を上げる（3.0 → 3.1）。画面の下端とタブの題にこの値を出す
+  const VERSION = "3.0";
   const el = id => document.getElementById(id);
   document.title = "CipherFlute 宝探し v" + VERSION;
   el("ver").textContent = "CipherFlute 宝探し v" + VERSION;
-  const NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+
   const MIC_ON_DB = -75;
   const FORGET_MS = 8000;      // これだけ無音が続いたら、並びを忘れて最初から
   const MAX_KEEP = 40;         // 並びは最後の40本まで
+  // 聞き取った音は、音名の代わりに古代文字で見せる（印の笛からの半音の数で文字を選ぶ）
+  const RUNES = "ᚠᚢᚦᚨᚱᚲᚷᚹᚺᚾᛁᛃᛇᛈᛉᛊᛏᛒᛖᛗᛚᛜᛞᛟ";
+  const LINES = {
+    wake:   ["扉が目を覚まそうとしている……", "マイクを準備しています。"],
+    calib:  ["……静寂を。扉が耳を澄ませている。", "周りの音を測っています。少しだけ静かにしてください。"],
+    ready:  ["我は、財宝の扉を守る者。\n魔法の笛を携えし者よ、その調べを聞かせよ。", "印のついている笛から順に吹いてください。"],
+    hear:   ["ひとつ、またひとつ。\n調べが扉に刻まれていく。", "続けて、次の笛を吹いてください。"],
+    lost:   ["調べは途絶えた。\nいま一度、はじめから奏でよ。", "しばらく音がなかったので、最初からにしました。印のついている笛から順に吹いてください。"],
+    nopack: ["この扉は、正しき道から訪れた者にのみ開かれる。", "宝探しの案内にある URL から開いてください。"],
+    nomic:  ["笛の調べが、扉に届かぬ……。", "ブラウザの設定でマイクを許可して、開き直してください。"],
+    nocfg:  ["扉への道が、霧に閉ざされている……。", "設定を読み込めませんでした。電波のよい場所で開き直してください。"],
+  };
+  const OPEN_WORDS = "扉は開かれた。\n汝に、財宝を授けよう。";
 
   const frag = new URLSearchParams(location.hash.replace(/^#/, ""));
   const search = new URLSearchParams(location.search);
@@ -88,25 +158,35 @@
   if (q("onmargin")) segOpt.onMarginDb = num("onmargin", 15);
 
   const st = { cfg: null, ctx: null, an: null, data: null, seg: null, t0: 0, seq: [], lastNoteAt: 0,
-               lo: 1200, hi: 3600, done: false, busy: false };
+               lo: 1200, hi: 3600, done: false, busy: false, again: false, line: "" };
   const C = () => window.CipherCodec;
 
-  function say(t) { el("msg").textContent = t; }
-  function noteName(f) {
-    const m = Math.round(69 + 12 * Math.log2(f / 440));
-    return NAMES[(m % 12 + 12) % 12] + (Math.floor(m / 12) - 1);
+  /* 守り人の台詞と添え書きを出す。同じ場面なら出し直さない（文字がちらつくため） */
+  function scene(key) {
+    const [words, hint] = LINES[key];
+    if (st.line !== key) {
+      const s = el("say"); s.textContent = words;
+      s.style.animation = "none"; void s.offsetWidth; s.style.animation = "";
+      st.line = key;
+    }
+    el("hint").textContent = hint;
+  }
+  function runeOf(f) {
+    const ref = st.cfg ? C().noteToFreq(st.cfg.reference_note) : 2093;
+    const k = Math.round(12 * Math.log2(f / ref));
+    return RUNES[((k + 8) % RUNES.length + RUNES.length) % RUNES.length];
   }
   function render() {
-    el("seq").innerHTML = st.seq.map(f => "<span>" + noteName(f) + "</span>").join("");
+    el("runes").innerHTML = st.seq.map(f => "<span>" + runeOf(f) + "</span>").join("");
   }
-  function reset(text) {
+  function reset(key) {
     st.seq = []; render();
     st.seg = window.SilenceSegmenter.create(segOpt); st.t0 = performance.now();
-    el("ring").textContent = "♪"; el("ring").className = "";
-    say(text || "印のついている笛から順に吹いてください。");
+    el("core").textContent = "✦";
+    scene(key || "ready");
   }
 
-  // ---- 開けるかを試す：最後に入った笛で終わる並びのうち、基準の笛らしい音から始まるものを全部試す
+  // ---- 開けるかを試す：最後に入った笛で終わる並びのうち、印の笛（基準の笛）らしい音から始まるものを全部試す
   function b64u(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "=";
     const b = atob(s); const o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; }
   async function openPack(canonical) {
@@ -126,7 +206,7 @@
       const refHz = C().noteToFreq(st.cfg.reference_note);
       const n = st.seq.length;
       for (let i = n - 2; i >= 0; i--) {
-        if (Math.abs(1200 * Math.log2(st.seq[i] / refHz)) > 60) continue;   // 基準の笛らしくない音からは始めない
+        if (Math.abs(1200 * Math.log2(st.seq[i] / refHz)) > 60) continue;   // 印の笛らしくない音からは始めない
         const r = C().decode(st.seq.slice(i), st.cfg, true);
         if (!r || !r.status || r.status.startsWith("error:")) continue;
         const canon = st.cfg.mode === "symbols" ? Uint8Array.from(r.symbols || []) : r.payload;
@@ -136,59 +216,67 @@
     } finally { st.busy = false; }
     if (st.again && !st.done) tryOpen();
   }
-  // ---- 成功の演出：金色の輪、大きな文字、紙吹雪、短いファンファーレ
-  function fanfare() {
+
+  // ---- 扉が開く演出：魔法陣が金色に燃え、扉が左右に開いて光があふれ、光の粒が舞い上がる。ハープのような分散和音
+  function pluck(ctx, out, f, at, len, amp) {
+    const o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = "sine"; o.frequency.value = f;
+    const o2 = ctx.createOscillator(), g2 = ctx.createGain();   // 1オクターブ上を薄く重ねて、弦のきらめきを出す
+    o2.type = "sine"; o2.frequency.value = f * 2; g2.gain.value = 0.15;
+    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(amp, at + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0008, at + len);
+    o.connect(g); o2.connect(g2).connect(g); g.connect(out);
+    o.start(at); o2.start(at); o.stop(at + len + 0.05); o2.stop(at + len + 0.05);
+  }
+  function harp() {
     const ctx = st.ctx; if (!ctx) return;
     const t0 = ctx.currentTime + 0.05;
-    const out = ctx.createGain(); out.gain.value = 0.18; out.connect(ctx.destination);
-    // ド・ミ・ソ・高いド（C6 E6 G6 C7）。最後の音だけ長く伸ばし、5度上を薄く重ねる
-    [[1047, 0, .12], [1319, .13, .12], [1568, .26, .12], [2093, .40, .75], [3136, .40, .75]].forEach(([f, at, len], i) => {
-      const o = ctx.createOscillator(); const g = ctx.createGain();
-      o.type = "triangle"; o.frequency.value = f;
-      const peak = i === 4 ? .25 : 1;
-      g.gain.setValueAtTime(0, t0 + at); g.gain.linearRampToValueAtTime(peak, t0 + at + .015);
-      g.gain.exponentialRampToValueAtTime(0.001, t0 + at + len);
-      o.connect(g).connect(out); o.start(t0 + at); o.stop(t0 + at + len + .05);
-    });
+    const out = ctx.createGain(); out.gain.value = 0.16; out.connect(ctx.destination);
+    // C6 E6 G6 C7 E7 G7 C8 を速く上り、最後に G6・C7・G7 を重ねて伸ばす
+    [1047, 1319, 1568, 2093, 2637, 3136, 4186].forEach((f, i) => pluck(ctx, out, f, t0 + i * 0.075, 1.2, 0.8));
+    pluck(ctx, out, 2093, t0 + 0.6, 2.2, 1); pluck(ctx, out, 3136, t0 + 0.6, 2.2, 0.5); pluck(ctx, out, 1568, t0 + 0.6, 2.2, 0.5);
   }
-  function confetti() {
+  function sparkles() {
     if (window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const cv = el("fx"), dpr = window.devicePixelRatio || 1;
-    cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+    const cv = el("fx"), dpr = window.devicePixelRatio || 1, W = innerWidth || 360, H = innerHeight || 640;
+    cv.width = W * dpr; cv.height = H * dpr;
     const g = cv.getContext("2d"); g.scale(dpr, dpr);
-    const COLORS = ["#c8a04a", "#e8c766", "#9a3b1e", "#2f5d7c", "#4a6b4f", "#d9534f", "#ffffff"];
-    const r = el("ring").getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
     const ps = [];
-    for (let i = 0; i < 180; i++) {
-      const a = Math.random() * Math.PI * 2, v = 4 + Math.random() * 9;
-      ps.push({ x: cx, y: cy, vx: Math.cos(a) * v, vy: Math.sin(a) * v - 6, w: 6 + Math.random() * 6, h: 3 + Math.random() * 4,
-                rot: Math.random() * 6, vr: (Math.random() - .5) * .4, c: COLORS[i % COLORS.length], star: i % 9 === 0 });
+    for (let i = 0; i < 160; i++) {
+      ps.push({ x: W / 2 + (Math.random() - .5) * W * .5, y: H / 2 + (Math.random() - .5) * H * .3,
+                vx: (Math.random() - .5) * 2.2, vy: -1 - Math.random() * 3.2, r: 1 + Math.random() * 2.6,
+                ph: Math.random() * 6.28, hue: Math.random() < .8 ? "232,199,102" : "159,227,255", delay: Math.random() * 900 });
     }
-    const t0 = performance.now();
+    const t0 = performance.now(); let last = t0;
     (function draw(now) {
-      const dt = Math.min(3, ((now || performance.now()) - (draw.last || t0)) / 16.7); draw.last = now || performance.now();
-      g.clearRect(0, 0, innerWidth, innerHeight);
+      now = now || performance.now(); const dt = Math.min(3, (now - last) / 16.7); last = now;
+      const age = now - t0;
+      g.clearRect(0, 0, W, H);
       for (const p of ps) {
-        p.vy += 0.25 * dt; p.vx *= Math.pow(0.985, dt); p.x += p.vx * dt; p.y += p.vy * dt; p.rot += p.vr * dt;
-        g.save(); g.translate(p.x, p.y); g.rotate(p.rot); g.fillStyle = p.c;
-        if (p.star) { g.font = "16px sans-serif"; g.fillText("✦", -6, 6); } else g.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
-        g.restore();
+        if (age < p.delay) continue;
+        p.x += p.vx * dt; p.y += p.vy * dt; p.vy -= 0.01 * dt; p.ph += 0.2 * dt;
+        const a = Math.max(0, 1 - (age - p.delay) / 2600) * (0.55 + 0.45 * Math.sin(p.ph));
+        g.beginPath(); g.fillStyle = "rgba(" + p.hue + "," + a.toFixed(3) + ")";
+        g.shadowColor = "rgba(" + p.hue + ",1)"; g.shadowBlur = 8;
+        g.arc(p.x, p.y, p.r, 0, Math.PI * 2); g.fill();
       }
-      if (performance.now() - t0 < 3200) requestAnimationFrame(draw); else g.clearRect(0, 0, innerWidth, innerHeight);
+      if (age < 3600) requestAnimationFrame(draw); else g.clearRect(0, 0, W, H);
     })();
   }
   function success(p) {
     st.done = true;
-    el("ring").className = "win"; el("ring").textContent = "💎";
-    el("msg").className = "win"; say("財宝を発見！");
-    el("seq").style.opacity = ".35"; el("again").style.display = "none";
-    fanfare(); confetti();
-    if (navigator.vibrate) navigator.vibrate([40, 60, 40, 60, 120]);
+    el("circle").className = "win"; el("core").textContent = "✧";
+    // 台詞は扉の光の中にだけ出す（下にも出すと、光を透けて二重に見える）
+    el("say").textContent = ""; el("hint").textContent = "";
+    el("again").style.display = "none";
+    harp();
+    if (navigator.vibrate) navigator.vibrate([40, 60, 40, 60, 160]);
+    const gate = el("gate");
+    el("gateWords").textContent = OPEN_WORDS;
+    setTimeout(() => { gate.style.display = "block"; }, 350);
+    setTimeout(() => { gate.classList.add("open"); sparkles(); }, 700);
     if (typeof p.goto === "string" && /^https?:\/\//i.test(p.goto)) {
-      setTimeout(() => { el("msg").className = ""; say((p.msg || "開きます") + "…"); }, 1600);
-      setTimeout(() => location.assign(p.goto), 2600);
-    } else if (p.msg) {
-      setTimeout(() => { el("msg").className = ""; say(p.msg); }, 1600);
+      setTimeout(() => location.assign(p.goto), 4000);
     }
   }
 
@@ -201,20 +289,41 @@
     const f = (pk && pk.level > MIC_ON_DB) ? pk.freq : 0;
     const now = performance.now();
     const ev = st.seg.feed(now - st.t0, db, f);
-    if (ev.type === "onset" || ev.type === "sounding") el("ring").className = "on";
-    else if (ev.type === "idle" || ev.type === "note" || ev.type === "reject") el("ring").className = "";
-    if (ev.type === "calibrating") say("周りの音を測っています。少しだけ静かに…");
-    if (ev.type === "idle" && st.seq.length === 0 && el("msg").textContent.startsWith("周り")) say("印のついている笛から順に吹いてください。");
+    if (ev.type === "onset" || ev.type === "sounding") el("circle").className = "on";
+    else if (ev.type === "idle" || ev.type === "note" || ev.type === "reject") el("circle").className = "";
+    if (ev.type === "calibrating") scene("calib");
+    if (ev.type === "idle" && st.seq.length === 0 && st.line === "calib") scene("ready");
     if (ev.type === "note" && ev.freq && ev.freq >= st.lo && ev.freq <= st.hi) {
       st.seq.push(ev.freq); if (st.seq.length > MAX_KEEP) st.seq.shift();
       st.lastNoteAt = now;
-      el("ring").textContent = String(st.seq.length);
-      render(); say("聞き取っています。続けて吹いてください。");
+      const core = el("core"); core.textContent = runeOf(ev.freq);
+      core.classList.remove("pulse"); void core.offsetWidth; core.classList.add("pulse");
+      render(); scene("hear");
       if (navigator.vibrate) navigator.vibrate(20);
       tryOpen();
     }
-    if (st.seq.length && now - st.lastNoteAt > FORGET_MS && !st.busy) reset("しばらく音がなかったので、最初からにしました。印のついている笛から順に吹いてください。");
+    if (st.seq.length && now - st.lastNoteAt > FORGET_MS && !st.busy) reset("lost");
     requestAnimationFrame(loop);
+  }
+
+  // ---- 夜空の星（ゆっくり瞬く）
+  function stars() {
+    const cv = el("stars"), dpr = window.devicePixelRatio || 1;
+    const fit = () => { cv.width = (innerWidth || 360) * dpr; cv.height = (innerHeight || 640) * dpr; };
+    fit(); addEventListener("resize", fit);
+    const g = cv.getContext("2d");
+    const ss = Array.from({ length: 90 }, () => ({ x: Math.random(), y: Math.random(), r: Math.random() * 1.3 + .3,
+                                                    ph: Math.random() * 6.28, sp: .01 + Math.random() * .03 }));
+    const still = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    (function tw() {
+      g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, cv.width, cv.height);
+      for (const s of ss) {
+        if (!still) s.ph += s.sp;
+        g.fillStyle = "rgba(243,236,216," + (0.35 + 0.35 * Math.sin(s.ph)).toFixed(3) + ")";
+        g.beginPath(); g.arc(s.x * (innerWidth || 360), s.y * (innerHeight || 640), s.r, 0, Math.PI * 2); g.fill();
+      }
+      if (!still) requestAnimationFrame(tw);
+    })();
   }
 
   async function startMic() {
@@ -227,18 +336,20 @@
     st.data = new Float32Array(st.an.frequencyBinCount);
     if (st.ctx.state !== "running") { try { await st.ctx.resume(); } catch (_) {} }
   }
-  function begin() { reset(); requestAnimationFrame(loop); }
+  function begin() { reset("calib"); requestAnimationFrame(loop); }
 
+  stars();
+  scene("wake");
   (async () => {
-    if (!pack) say("このページは、宝探しの案内にある URL から開いてください。");
+    if (!pack) { scene("nopack"); return; }
     try {
       const base = await (await fetch("cipher_config.json")).json();
       st.cfg = Object.assign(base, over);
       st.lo = C().noteToFreq(st.cfg.lo_note) * Math.pow(2, -2 / 12);
       st.hi = C().noteToFreq(st.cfg.hi_note) * Math.pow(2, 2 / 12);
-    } catch (e) { say("設定を読み込めませんでした。電波のよい場所で開き直してください。"); return; }
+    } catch (e) { scene("nocfg"); return; }
     try { await startMic(); }
-    catch (e) { say("マイクを使えませんでした。ブラウザの設定でマイクを許可して、開き直してください。"); return; }
+    catch (e) { scene("nomic"); return; }
     if (st.ctx.state === "running") { begin(); return; }
     // iPhone などは、画面に一度触れないと音の処理が動かない
     el("tap").style.display = "flex";
@@ -247,7 +358,7 @@
       el("tap").style.display = "none"; begin();
     };
   })();
-  el("again").onclick = () => { if (!st.done && st.seg) reset(); };
+  el("again").onclick = () => { if (!st.done && st.seg) reset("ready"); };
 })();
 </script>
 </body>
