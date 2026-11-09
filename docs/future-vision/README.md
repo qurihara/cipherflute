@@ -9,4 +9,7 @@ CipherFlute の構想の出発点（冲方丁「メトセラとプラスチッ�
 
 動画は Google の生成 AI（Gemini）で生成し、2本をフェードアウトとフェードインでつないだものです。
 
-公開アドレス：https://unryu.org/cipherflute/future-vision/future_vision_robot_to_girl.mp4
+ProtoPedia（https://protopedia.net/prototype/9394 ）の「なぜ作ったのか」の節では、jsDelivr のアドレスで埋め込んでいる（video/mp4 として配信されるため）。
+https://cdn.jsdelivr.net/gh/qurihara/cipherflute@main/docs/future-vision/future_vision_robot_to_girl.mp4
+
+unryu.org/cipherflute/ の側では、2026-11-09 の時点でこの mp4 だけが 404 になる（poster.jpg は配信される）。原因は未調査。
