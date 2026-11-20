@@ -6,7 +6,7 @@
 <meta name="robots" content="noindex">
 <meta name="referrer" content="no-referrer">
 <meta name="theme-color" content="#14181f">
-<title>CipherFlute v1.0</title>
+<title>CipherFlute v1.1</title>
 <style>
   /* The simplest decoding page: open, play the flutes, and the page opens the link.
      For a carrier whose link is fixed (a business card). index.html is the general one. */
@@ -30,6 +30,7 @@
            padding:9px 22px; font-size:.95rem; font-family:inherit; }
   button.big { background:var(--accent); color:#0b1424; border:none; font-weight:600; padding:12px 28px; }
   #go { display:none; margin-top:18px; color:var(--ok); font-size:1rem; word-break:break-all; }
+  #diag { margin-top:10px; font-size:.72rem; color:var(--mute); font-family:ui-monospace,Menlo,monospace; min-height:1.2em; word-break:break-all; }
   .note { margin-top:28px; font-size:.75rem; color:var(--mute); line-height:1.6; }
   .note a { color:var(--mute); }
 </style>
@@ -42,11 +43,12 @@
   <div id="sayEn">Getting ready…</div>
   <div id="seq"></div>
   <a id="go" href="#">開く / Open</a>
+  <div id="diag"></div>
   <div><button id="tapBtn" class="big" style="display:none">タップして始める / Tap to start</button></div>
   <div><button id="againBtn" style="display:none">やり直す / Start over</button></div>
   <p class="note">笛を左から順に、続けて吹いてください。息は切らなくてかまいません。<br>
      Play the flutes one by one, left to right. You need not pause between them.<br>
-     <a href="https://github.com/qurihara/cipherflute">CipherFlute</a> · v1.0</p>
+     <a href="https://github.com/qurihara/cipherflute">CipherFlute</a> · v1.1</p>
 </div>
 <script src="cipher_codec.js?v=17"></script>
 <script src="silence_segmenter.js?v=17"></script>
@@ -124,10 +126,18 @@
     if (st.busy) { st.again = true; return; }
     st.busy = true; st.again = false;
     try {
-      const refHz = C().noteToFreq(st.cfg.reference_note);
+      /* Every start position is tried (v1.1). v1.0 tried only runs starting near the nominal
+         reference pitch, as hunt.html does; AES-GCM decides right from wrong, so trying more
+         runs cannot open a wrong one. The last full-length attempt is shown in #diag. */
+      let shown = false;
       for (let i = st.seq.length - 2; i >= 0; i--) {
-        if (Math.abs(1200 * Math.log2(st.seq[i] / refHz)) > 60) continue;   // a run starts at the reference flute
-        const r = C().decode(st.seq.slice(i), st.cfg, true);
+        let r = null;
+        try { r = C().decode(st.seq.slice(i), st.cfg, true); } catch (e) { r = { status: "error: " + e.message }; }
+        if (i === 0 || !shown) {
+          const syms = r && r.symbols ? r.symbols.join(",") : "-";
+          el("diag").textContent = (st.seq.length - i) + "本: " + (r ? r.status : "-") + " [" + syms + "]";
+          shown = (i === 0);
+        }
         if (!r || !r.status || r.status.startsWith("error:")) continue;
         const canon = st.cfg.mode === "symbols" ? Uint8Array.from(r.symbols || []) : r.payload;
         const url = await unlock(canon);
