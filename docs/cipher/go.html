@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#14181f">
+<title>CipherFlute v1.0</title>
+<style>
+  /* The simplest decoding page: open, play the flutes, and the page opens the link.
+     For a carrier whose link is fixed (a business card). index.html is the general one. */
+  :root { --bg:#14181f; --card:#1d232d; --ink:#eef1f5; --mute:#9aa4b2; --ok:#5fd38d; --ng:#f08a7a; --accent:#7fb8ff; }
+  * { box-sizing:border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--ink);
+         font-family:-apple-system,"Hiragino Sans","Noto Sans JP","Segoe UI",sans-serif;
+         display:flex; flex-direction:column; align-items:center; justify-content:center; padding:16px; text-align:center; }
+  .wrap { width:100%; max-width:420px; }
+  h1 { font-size:1rem; font-weight:600; letter-spacing:.08em; color:var(--mute); margin:0 0 20px; }
+  #ring { width:150px; height:150px; margin:0 auto; border-radius:50%; border:3px solid #2c3442;
+          display:flex; align-items:center; justify-content:center; font-size:1.9rem; font-weight:600;
+          transition:border-color .12s, box-shadow .12s, transform .12s; }
+  #ring.on { border-color:var(--accent); box-shadow:0 0 18px rgba(127,184,255,.55); transform:scale(1.04); }
+  #ring.win { border-color:var(--ok); box-shadow:0 0 26px rgba(95,211,141,.8); }
+  #say { font-size:1.15rem; line-height:1.7; margin:22px 0 4px; min-height:2em; }
+  #sayEn { font-size:.85rem; color:var(--mute); min-height:1.3em; margin:0 0 16px; }
+  #seq { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; min-height:34px; }
+  #seq span { background:var(--card); border:1px solid #2c3442; border-radius:6px; padding:4px 7px; font-size:.85rem; }
+  button { margin-top:22px; background:var(--card); color:var(--ink); border:1px solid #3a4352; border-radius:20px;
+           padding:9px 22px; font-size:.95rem; font-family:inherit; }
+  button.big { background:var(--accent); color:#0b1424; border:none; font-weight:600; padding:12px 28px; }
+  #go { display:none; margin-top:18px; color:var(--ok); font-size:1rem; word-break:break-all; }
+  .note { margin-top:28px; font-size:.75rem; color:var(--mute); line-height:1.6; }
+  .note a { color:var(--mute); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>CipherFlute</h1>
+  <div id="ring">♪</div>
+  <div id="say">準備しています…</div>
+  <div id="sayEn">Getting ready…</div>
+  <div id="seq"></div>
+  <a id="go" href="#">開く / Open</a>
+  <div><button id="tapBtn" class="big" style="display:none">タップして始める / Tap to start</button></div>
+  <div><button id="againBtn" style="display:none">やり直す / Start over</button></div>
+  <p class="note">笛を左から順に、続けて吹いてください。息は切らなくてかまいません。<br>
+     Play the flutes one by one, left to right. You need not pause between them.<br>
+     <a href="https://github.com/qurihara/cipherflute">CipherFlute</a> · v1.0</p>
+</div>
+<script src="cipher_codec.js?v=17"></script>
+<script src="silence_segmenter.js?v=17"></script>
+<script src="fft_peak.js?v=17"></script>
+<script>
+(() => {
+  "use strict";
+  /* How it decides, without buttons (the same as hunt.html):
+   * after every flute it tries every run of the flutes heard that ends with the
+   * newest one and starts at a note near the reference flute, and accepts a run
+   * only when it unlocks goto_enc (or c=) with AES-GCM. The cipher's
+   * authentication tells right from wrong, so the page needs neither the number
+   * of flutes nor a "done" button, and a cough before the flutes does no harm. */
+  const el = id => document.getElementById(id);
+  const MIC_ON_DB = -75;
+  const FORGET_MS = 8000;      // this long without a flute: forget and start over
+  const MAX_KEEP = 40;
+  const frag = new URLSearchParams(location.hash.replace(/^#/, ""));
+  const search = new URLSearchParams(location.search);
+  const q = k => frag.has(k) ? frag.get(k) : search.get(k);
+  const gotoEnc = (q("goto_enc") || "").trim();
+  const pack = (q("c") || "").trim();
+  const noteRe = /^[A-Ga-g][#b]?-?\d+$/;
+  const over = {};
+  if (q("mode") === "symbols" || q("mode") === "sequential") over.mode = q("mode");
+  if (/^\d+$/.test(q("parity") || "")) over.ecc_parity = parseInt(q("parity"), 10);
+  for (const [k, key] of [["ref", "reference_note"], ["lo", "lo_note"], ["hi", "hi_note"]])
+    if (noteRe.test(q(k) || "")) over[key] = q(k);
+  if (q("norepeat") === "1") over.no_repeat = true;
+  if (q("norepeat") === "0") over.no_repeat = false;
+  const num = (k, d) => /^\d+(\.\d+)?$/.test(q(k) || "") ? parseFloat(q(k)) : d;
+  // Notes are cut at silences and also where the pitch changes, so the flutes may be played without pauses.
+  const segOpt = { gapMs: num("gap", 100), pitchSplitCents: num("splitcents", 80),
+                   pitchStableMs: num("stablems", 60), minNoteMs: num("minnote", 70),
+                   endMs: Number.MAX_SAFE_INTEGER };
+  const st = { cfg: null, ctx: null, an: null, data: null, seg: null, t0: 0, seq: [], lastNoteAt: 0,
+               lo: 1200, hi: 3600, done: false, busy: false, again: false };
+  const C = () => window.CipherCodec;
+  const LINES = {
+    wake:   ["準備しています…", "Getting ready…"],
+    calib:  ["少しだけ静かにしてください", "Measuring the room. Please keep quiet for a moment."],
+    ready:  ["笛を吹いてください", "Play the flutes."],
+    hear:   ["聞こえています。続けてください", "Listening. Keep playing."],
+    lost:   ["もう一度、最初の笛から吹いてください", "Please start again from the first flute."],
+    win:    ["開きます", "Opening…"],
+    nolink: ["このページには行き先が書かれていません", "This link has no destination. Open it from the QR code."],
+    nomic:  ["マイクを使えません。ブラウザの設定で許可してください", "The microphone is not available. Please allow it in the browser."],
+    nocfg:  ["設定を読み込めませんでした。開き直してください", "Could not load the settings. Please reload."],
+  };
+  function say(key) { el("say").textContent = LINES[key][0]; el("sayEn").textContent = LINES[key][1]; }
+  function noteOf(f) { return C().midiToNote(Math.round(69 + 12 * Math.log2(f / 440))); }
+  function render() { el("seq").innerHTML = st.seq.map(f => "<span>" + noteOf(f) + "</span>").join(""); }
+  function reset(key) {
+    st.seq = []; render();
+    st.seg = window.SilenceSegmenter.create(segOpt); st.t0 = performance.now();
+    el("ring").textContent = "♪";
+    say(key || "ready");
+  }
+  function b64u(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "=";
+    const b = atob(s); const o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; }
+  async function unlock(canonical) {
+    try {
+      const raw = await crypto.subtle.digest("SHA-256", canonical);
+      const key = await crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["decrypt"]);
+      const blob = b64u(gotoEnc || pack);
+      const pt = new TextDecoder().decode(await crypto.subtle.decrypt(
+        { name: "AES-GCM", iv: blob.slice(0, 12) }, key, blob.slice(12)));
+      if (gotoEnc) return /^https?:\/\//i.test(pt) ? pt : null;
+      const p = JSON.parse(pt);
+      return p && typeof p.goto === "string" && /^https?:\/\//i.test(p.goto) ? p.goto : null;
+    } catch (_) { return null; }
+  }
+  async function tryOpen() {
+    if (st.done) return;
+    if (st.busy) { st.again = true; return; }
+    st.busy = true; st.again = false;
+    try {
+      const refHz = C().noteToFreq(st.cfg.reference_note);
+      for (let i = st.seq.length - 2; i >= 0; i--) {
+        if (Math.abs(1200 * Math.log2(st.seq[i] / refHz)) > 60) continue;   // a run starts at the reference flute
+        const r = C().decode(st.seq.slice(i), st.cfg, true);
+        if (!r || !r.status || r.status.startsWith("error:")) continue;
+        const canon = st.cfg.mode === "symbols" ? Uint8Array.from(r.symbols || []) : r.payload;
+        const url = await unlock(canon);
+        if (url) { success(url); return; }
+      }
+    } finally { st.busy = false; }
+    if (st.again && !st.done) tryOpen();
+  }
+  function chime() {
+    const ctx = st.ctx; if (!ctx) return;
+    const t = ctx.currentTime + 0.03, out = ctx.createGain(); out.gain.value = 0.15; out.connect(ctx.destination);
+    [1047, 1319, 1568, 2093].forEach((f, i) => {
+      const o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = f;
+      g.gain.setValueAtTime(0, t + i * 0.08); g.gain.linearRampToValueAtTime(0.8, t + i * 0.08 + 0.01);
+      g.gain.exponentialRampToValueAtTime(0.001, t + i * 0.08 + 1.0);
+      o.connect(g).connect(out); o.start(t + i * 0.08); o.stop(t + i * 0.08 + 1.05);
+    });
+  }
+  function success(url) {
+    st.done = true;
+    el("ring").className = "win"; el("ring").textContent = "✓";
+    say("win"); el("againBtn").style.display = "none";
+    const a = el("go"); a.href = url; a.textContent = "開く / Open: " + url; a.style.display = "block";
+    chime();
+    if (navigator.vibrate) navigator.vibrate([40, 60, 120]);
+    setTimeout(() => location.assign(url), 2000);
+  }
+  function loop() {
+    if (st.done) return;
+    st.an.getFloatFrequencyData(st.data);
+    const pk = window.FftPeak.peakInBand(st.data, st.ctx.sampleRate / st.an.fftSize, st.lo, st.hi);
+    const db = pk ? pk.level : -120;
+    const f = (pk && pk.level > MIC_ON_DB) ? pk.freq : 0;
+    const now = performance.now();
+    const ev = st.seg.feed(now - st.t0, db, f);
+    if (ev.type === "onset" || ev.type === "sounding") el("ring").className = "on";
+    else if (ev.type === "idle" || ev.type === "note" || ev.type === "reject") el("ring").className = "";
+    if (ev.type === "calibrating") say("calib");
+    if (ev.type === "idle" && st.seq.length === 0 && el("say").textContent === LINES.calib[0]) say("ready");
+    if (ev.type === "note" && ev.freq && ev.freq >= st.lo && ev.freq <= st.hi) {
+      st.seq.push(ev.freq); if (st.seq.length > MAX_KEEP) st.seq.shift();
+      st.lastNoteAt = now;
+      el("ring").textContent = noteOf(ev.freq);
+      render(); say("hear"); el("againBtn").style.display = "";
+      if (navigator.vibrate) navigator.vibrate(15);
+      tryOpen();
+    }
+    if (st.seq.length && now - st.lastNoteAt > FORGET_MS && !st.busy) reset("lost");
+    requestAnimationFrame(loop);
+  }
+  async function startMic() {
+    st.ctx = st.ctx || new (window.AudioContext || window.webkitAudioContext)();
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+    const src = st.ctx.createMediaStreamSource(stream);
+    st.an = new AnalyserNode(st.ctx, { fftSize: 4096, smoothingTimeConstant: 0 });
+    src.connect(st.an);
+    st.data = new Float32Array(st.an.frequencyBinCount);
+    if (st.ctx.state !== "running") { try { await st.ctx.resume(); } catch (_) {} }
+  }
+  function begin() { reset("calib"); requestAnimationFrame(loop); }
+  el("againBtn").onclick = () => { if (!st.done && st.seg) reset("ready"); };
+  say("wake");
+  (async () => {
+    if (!gotoEnc && !pack) { say("nolink"); return; }
+    try {
+      const base = await (await fetch("cipher_config.json")).json();
+      st.cfg = Object.assign(base, over);
+      st.lo = C().noteToFreq(st.cfg.lo_note) * Math.pow(2, -2 / 12);
+      st.hi = C().noteToFreq(st.cfg.hi_note) * Math.pow(2, 2 / 12);
+    } catch (e) { say("nocfg"); return; }
+    try { await startMic(); }
+    catch (e) { say("nomic"); return; }
+    if (st.ctx.state === "running") { begin(); return; }
+    // iPhone and some others start sound processing only after a touch
+    el("tapBtn").style.display = "";
+    el("tapBtn").onclick = async () => {
+      try { await st.ctx.resume(); } catch (_) {}
+      el("tapBtn").style.display = "none"; begin();
+    };
+  })();
+})();
+</script>
+</body>
+</html>
