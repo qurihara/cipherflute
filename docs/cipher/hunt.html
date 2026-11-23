@@ -131,7 +131,7 @@
 (function () {
   "use strict";
   // ★版の番号★ 直すたびに小さい桁を上げる（3.0 → 3.1）。画面の下端とタブの題にこの値を出す
-  const VERSION = "3.3";
+  const VERSION = "3.4";
   const el = id => document.getElementById(id);
   document.title = "CipherFlute 宝探し v" + VERSION;
   el("ver").textContent = "CipherFlute 宝探し v" + VERSION;
@@ -165,6 +165,14 @@
     if (noteRe.test(q(k) || "")) over[key] = q(k);
   if (q("norepeat") === "1") over.no_repeat = true;
   if (q("norepeat") === "0") over.no_repeat = false;
+  /* c= には暗号文を「.」でつないで並べられる（v3.4）。並べたときは、下の読み方をすべて試す。 */
+  const packs = pack.split(".").filter(Boolean);
+  /* readConfigs:begin */
+  const READ_CONFIGS = [
+    { lo_note: "G#6", hi_note: "G7", ecc_parity: 2 },
+    { lo_note: "A6", hi_note: "G7", ecc_parity: 2 },
+  ];
+  /* readConfigs:end */
   const num = (k, d) => /^\d+(\.\d+)?$/.test(q(k) || "") ? parseFloat(q(k)) : d;
   // 区切りの設定は、index.html の「音が変わったところでも区切る」を入れたときの初期値と同じ
   const segOpt = { gapMs: num("gap", 100), pitchSplitCents: num("splitcents", 80),
@@ -205,13 +213,19 @@
   function b64u(s) { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "=";
     const b = atob(s); const o = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) o[i] = b.charCodeAt(i); return o; }
   async function openPack(canonical) {
+    let key;
     try {
       const raw = await crypto.subtle.digest("SHA-256", canonical);
-      const key = await crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["decrypt"]);
-      const blob = b64u(pack);
-      const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: blob.slice(0, 12) }, key, blob.slice(12));
-      return JSON.parse(new TextDecoder().decode(pt));
+      key = await crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["decrypt"]);
     } catch (_) { return null; }
+    for (const text of packs) {
+      try {
+        const blob = b64u(text);
+        const pt = await crypto.subtle.decrypt({ name: "AES-GCM", iv: blob.slice(0, 12) }, key, blob.slice(12));
+        return JSON.parse(new TextDecoder().decode(pt));
+      } catch (_) { /* この暗号文は開かなかったので、次を試す */ }
+    }
+    return null;
   }
   /* 試す並びを、試す順に返す（v3.3）。scripts/hunt_sim.js がこの関数をそのまま読み込んで検査する。
    * 順方向：最後に入った笛で終わる並びのうち、印の笛（基準の笛）らしい音から始まるもの。
@@ -236,15 +250,21 @@
     if (st.busy) { st.again = true; return; }   // 試している最中に入った笛は、終わってから試し直す
     st.busy = true; st.again = false;
     try {
-      const refHz = C().noteToFreq(st.cfg.reference_note);
-      for (const cand of runsToTry(st.seq, refHz)) {
-        let r = null;
-        // 逆向きの並びで復号器が例外を出しても、残りの並びは試し続ける
-        try { r = C().decode(cand.run, st.cfg, true); } catch (_) { continue; }
-        if (!r || !r.status || r.status.startsWith("error:")) continue;
-        const canon = st.cfg.mode === "symbols" ? Uint8Array.from(r.symbols || []) : r.payload;
-        const p = await openPack(canon);
-        if (p) { success(p); return; }
+      const tried = new Set();   // 同じ記号列を何度も試さない
+      for (const cfg of st.cfgs) {
+        const refHz = C().noteToFreq(cfg.reference_note);
+        for (const cand of runsToTry(st.seq, refHz)) {
+          let r = null;
+          // 逆向きの並びで復号器が例外を出しても、残りの並びは試し続ける
+          try { r = C().decode(cand.run, cfg, true); } catch (_) { continue; }
+          if (!r || !r.status || r.status.startsWith("error:")) continue;
+          const canon = cfg.mode === "symbols" ? Uint8Array.from(r.symbols || []) : r.payload;
+          const id = Array.from(canon).join(",");
+          if (tried.has(id)) continue;
+          tried.add(id);
+          const p = await openPack(canon);
+          if (p) { success(p); return; }
+        }
       }
     } finally { st.busy = false; }
     if (st.again && !st.done) tryOpen();
@@ -377,9 +397,11 @@
     if (!pack) { scene("nopack"); return; }
     try {
       const base = await (await fetch("cipher_config.json")).json();
-      st.cfg = Object.assign(base, over);
-      st.lo = C().noteToFreq(st.cfg.lo_note) * Math.pow(2, -2 / 12);
-      st.hi = C().noteToFreq(st.cfg.hi_note) * Math.pow(2, 2 / 12);
+      st.cfgs = (packs.length > 1 ? READ_CONFIGS : [over]).map(o => Object.assign({}, base, o));
+      st.cfg = st.cfgs[0];   // 古代文字の表示に使う
+      // 聞き取る音域は、すべての読み方の音域を含む範囲にする
+      st.lo = Math.min(...st.cfgs.map(c => C().noteToFreq(c.lo_note))) * Math.pow(2, -2 / 12);
+      st.hi = Math.max(...st.cfgs.map(c => C().noteToFreq(c.hi_note))) * Math.pow(2, 2 / 12);
     } catch (e) { scene("nocfg"); return; }
     try { await startMic(); }
     catch (e) { scene("nomic"); return; }
