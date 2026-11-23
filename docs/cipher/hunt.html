@@ -131,7 +131,7 @@
 (function () {
   "use strict";
   // ★版の番号★ 直すたびに小さい桁を上げる（3.0 → 3.1）。画面の下端とタブの題にこの値を出す
-  const VERSION = "3.2";
+  const VERSION = "3.3";
   const el = id => document.getElementById(id);
   document.title = "CipherFlute 宝探し v" + VERSION;
   el("ver").textContent = "CipherFlute 宝探し v" + VERSION;
@@ -213,16 +213,34 @@
       return JSON.parse(new TextDecoder().decode(pt));
     } catch (_) { return null; }
   }
+  /* 試す並びを、試す順に返す（v3.3）。scripts/hunt_sim.js がこの関数をそのまま読み込んで検査する。
+   * 順方向：最後に入った笛で終わる並びのうち、印の笛（基準の笛）らしい音から始まるもの。
+   * 逆方向：最後に入った笛が印の笛らしいときに限り、その並びを前後逆にしたもの。
+   * 逆の端から吹くと印の笛が最後に鳴るので、逆にすると符号の順に戻る。
+   * 正しい秘密でなければ AES-GCM の復号に失敗するので、逆方向を足しても別の笛では開かない。 */
+  /* runsToTry:begin */
+  function runsToTry(seq, refHz) {
+    const nearRef = f => Math.abs(1200 * Math.log2(f / refHz)) <= 60;
+    const n = seq.length, out = [];
+    const lastIsRef = n > 0 && nearRef(seq[n - 1]);
+    for (let i = n - 2; i >= 0; i--) {
+      const run = seq.slice(i);
+      if (nearRef(seq[i])) out.push({ start: i, reversed: false, run });
+      if (lastIsRef) out.push({ start: i, reversed: true, run: run.slice().reverse() });
+    }
+    return out;
+  }
+  /* runsToTry:end */
   async function tryOpen() {
     if (!pack || st.done) return;
     if (st.busy) { st.again = true; return; }   // 試している最中に入った笛は、終わってから試し直す
     st.busy = true; st.again = false;
     try {
       const refHz = C().noteToFreq(st.cfg.reference_note);
-      const n = st.seq.length;
-      for (let i = n - 2; i >= 0; i--) {
-        if (Math.abs(1200 * Math.log2(st.seq[i] / refHz)) > 60) continue;   // 印の笛らしくない音からは始めない
-        const r = C().decode(st.seq.slice(i), st.cfg, true);
+      for (const cand of runsToTry(st.seq, refHz)) {
+        let r = null;
+        // 逆向きの並びで復号器が例外を出しても、残りの並びは試し続ける
+        try { r = C().decode(cand.run, st.cfg, true); } catch (_) { continue; }
         if (!r || !r.status || r.status.startsWith("error:")) continue;
         const canon = st.cfg.mode === "symbols" ? Uint8Array.from(r.symbols || []) : r.payload;
         const p = await openPack(canon);
